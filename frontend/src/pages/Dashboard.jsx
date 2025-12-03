@@ -301,7 +301,7 @@ const Dashboard = () => {
                 <div>
                   <h3 className="text-2xl font-bold mb-1">View Complete Results</h3>
                   <p className="text-blue-100">
-                    See your comprehensive evaluation and generate your improved CV
+                    See your comprehensive evaluation and all your assessment results
                   </p>
                 </div>
               </div>

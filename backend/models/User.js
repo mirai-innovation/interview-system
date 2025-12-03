@@ -45,9 +45,6 @@ const userSchema = new mongoose.Schema(
       totalScore: { type: Number }
     },
     hardSkillsSurveyCompleted: { type: Boolean, default: false },
-    
-    // CV generado
-    generatedCV: { type: String },
   },
   { timestamps: true }
 );

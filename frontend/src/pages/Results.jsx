@@ -5,8 +5,6 @@ import api from '../utils/axios';
 const Results = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [generatedCV, setGeneratedCV] = useState(null);
 
   useEffect(() => {
     fetchProfile();
@@ -16,26 +14,10 @@ const Results = () => {
     try {
       const response = await api.get('/users/profile');
       setProfile(response.data);
-      if (response.data.generatedCV) {
-        setGeneratedCV(response.data.generatedCV);
-      }
     } catch (error) {
       console.error('Error obteniendo perfil:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGenerateCV = async () => {
-    setGenerating(true);
-    try {
-      const response = await api.post('/users/generate-cv');
-      setGeneratedCV(response.data.cv);
-      alert('CV generado exitosamente');
-    } catch (error) {
-      alert('Error al generar el CV');
-    } finally {
-      setGenerating(false);
     }
   };
 
@@ -90,30 +72,6 @@ const Results = () => {
               <p className="text-gray-600">❌ No completado</p>
             )}
           </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow mb-6">
-          <h2 className="text-xl font-semibold mb-4">CV Mejorado con IA</h2>
-          {!generatedCV ? (
-            <div>
-              <p className="mb-4 text-gray-600">
-                Genera un CV mejorado basado en todos tus resultados
-              </p>
-              <button
-                onClick={handleGenerateCV}
-                disabled={generating}
-                className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50"
-              >
-                {generating ? 'Generando...' : 'Generar CV Mejorado'}
-              </button>
-            </div>
-          ) : (
-            <div className="mt-4">
-              <div className="bg-gray-50 p-4 rounded whitespace-pre-wrap">
-                {generatedCV}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

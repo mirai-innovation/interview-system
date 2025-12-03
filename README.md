@@ -11,7 +11,6 @@ Sistema completo de evaluación de habilidades con análisis de CV mediante IA, 
 - ✅ Cuestionarios de habilidades blandas (160 preguntas)
 - ✅ Cuestionarios de habilidades duras - Inteligencias Múltiples (35 preguntas)
 - ✅ Panel de administración
-- ✅ Generación de CV mejorado con IA
 - ✅ Almacenamiento de CVs en AWS S3 (opcional, con fallback local)
 - ✅ Guardado automático de progreso de entrevista
 
@@ -131,7 +130,6 @@ Mirai-Intervieweb/
 - `POST /api/users/save-interview-progress` - Guardar progreso automáticamente
 - `POST /api/users/submit-soft-skills` - Enviar cuestionario habilidades blandas
 - `POST /api/users/submit-hard-skills` - Enviar cuestionario habilidades duras
-- `POST /api/users/generate-cv` - Generar CV mejorado
 - `GET /api/users/profile` - Obtener perfil del usuario
 - `GET /api/users/interview-responses` - Obtener respuestas de entrevista
 
@@ -155,7 +153,7 @@ Mirai-Intervieweb/
    - Guardado automático de progreso
    - Si sale, puede continuar desde donde se quedó
 7. **Cuestionarios**: El usuario completa los cuestionarios de habilidades
-8. **Resultados**: El usuario puede ver sus resultados y generar un CV mejorado
+8. **Resultados**: El usuario puede ver sus resultados completos de todas las evaluaciones
 
 ## 🔒 Seguridad
 

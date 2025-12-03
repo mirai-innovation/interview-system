@@ -12,13 +12,11 @@ import {
   evaluateMultipleIntelligences,
   transcribeVideoAudio
 } from "../utils/cvUtils.js";
-import OpenAI from "openai";
 import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
 
 dotenv.config();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const router = express.Router();
 
@@ -409,77 +407,6 @@ router.post("/submit-hard-skills", authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error("Error al procesar la encuesta:", error);
-    res.status(500).json({ message: "Error interno del servidor" });
-  }
-});
-
-// Generar CV mejorado
-router.post("/generate-cv", authMiddleware, async (req, res) => {
-  try {
-    const user = await User.findById(req.userId);
-    if (!user) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
-    }
-
-    // Recolectar datos positivos
-    const positiveSoftSkills = user.softSkillsResults?.results 
-      ? Object.entries(user.softSkillsResults.results)
-          .filter(([_, data]) => data.level && !data.level.includes("bajo"))
-          .map(([name, data]) => `${name}: ${data.level}`)
-      : [];
-
-    const positiveHardSkills = user.hardSkillsResults?.results
-      ? Object.entries(user.hardSkillsResults.results)
-          .filter(([_, data]) => data.level && !data.level.includes("bajo"))
-          .map(([name, data]) => `${name}: ${data.level}`)
-      : [];
-
-    const prompt = `
-Generate an improved professional CV based on the following information:
-
-Personal Data:
-- Name: ${user.name}
-- Email: ${user.email}
-- Date of birth: ${user.dob}
-- Gender: ${user.gender}
-- Academic level: ${user.academic_level}
-
-Original CV Analysis:
-${user.analysis || "Not available"}
-
-Highlighted Soft Skills:
-${positiveSoftSkills.length > 0 ? positiveSoftSkills.join("\n") : "Not available"}
-
-Highlighted Hard Skills:
-${positiveHardSkills.length > 0 ? positiveHardSkills.join("\n") : "Not available"}
-
-Interview Analysis:
-${user.interviewAnalysis ? user.interviewAnalysis.map(a => a.explanation).join("\n") : "Not available"}
-
-Generate a professional CV in plain text format, with paragraphs separated. 
-Only include positive and relevant aspects. 
-Include professional recommendations if appropriate.
-Format: Clear sections separated by blank lines.
-Respond in English.
-`;
-
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 1500,
-      temperature: 0.7,
-    });
-
-    const generatedCV = response.choices[0].message.content.trim();
-    user.generatedCV = generatedCV;
-    await user.save();
-
-    res.json({
-      message: "CV generado exitosamente",
-      cv: generatedCV
-    });
-  } catch (error) {
-    console.error("Error generando CV:", error);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 });
