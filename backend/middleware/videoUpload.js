@@ -14,10 +14,12 @@ const __dirname = path.dirname(__filename);
 // Configuración: 'local' o 's3'
 const STORAGE_TYPE = process.env.STORAGE_TYPE || 'local';
 
-// Crear carpeta de videos si no existe (para almacenamiento local)
+// Crear carpeta de videos solo si se usa almacenamiento local
 const videosDir = path.join(__dirname, '../uploads/videos');
-if (!fs.existsSync(videosDir)) {
-  fs.mkdirSync(videosDir, { recursive: true });
+if (STORAGE_TYPE === 'local') {
+  if (!fs.existsSync(videosDir)) {
+    fs.mkdirSync(videosDir, { recursive: true });
+  }
 }
 
 let videoUpload;

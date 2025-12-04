@@ -22,10 +22,12 @@ console.log('  AWS_SECRET_ACCESS_KEY:', process.env.AWS_SECRET_ACCESS_KEY ? '✅
 console.log('  AWS_REGION:', process.env.AWS_REGION || 'Not set');
 console.log('  AWS_BUCKET_NAME:', process.env.AWS_BUCKET_NAME || 'Not set');
 
-// Crear carpeta de uploads si no existe (para almacenamiento local)
+// Crear carpeta de uploads solo si se usa almacenamiento local
 const uploadsDir = path.join(__dirname, '../uploads/cvs');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+if (STORAGE_TYPE === 'local') {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
 }
 
 let upload;

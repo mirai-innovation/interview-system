@@ -15,37 +15,72 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // CORS
-const allowedOrigins = process.env.CORS_ORIGINS 
-  ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
-  : ['http://localhost:3000'];
+let allowedOrigins = [];
+
+if (process.env.CORS_ORIGINS) {
+  allowedOrigins = process.env.CORS_ORIGINS.split(',').map(origin => origin.trim()).filter(origin => origin.length > 0);
+} else {
+  allowedOrigins = ['http://localhost:3000'];
+}
 
 // En desarrollo, permitir localhost
 if (process.env.NODE_ENV !== 'production') {
-  allowedOrigins.push('http://localhost:3000', 'http://localhost:3001');
+  if (!allowedOrigins.includes('http://localhost:3000')) {
+    allowedOrigins.push('http://localhost:3000');
+  }
+  if (!allowedOrigins.includes('http://localhost:3001')) {
+    allowedOrigins.push('http://localhost:3001');
+  }
 }
+
+// Debug: Mostrar configuración de CORS
+console.log('🌐 CORS Configuration:');
+console.log('  NODE_ENV:', process.env.NODE_ENV);
+console.log('  CORS_ORIGINS env:', process.env.CORS_ORIGINS);
+console.log('  Allowed Origins:', allowedOrigins);
 
 const corsOptions = {
   origin: function (origin, callback) {
     // Permitir requests sin origin (mobile apps, Postman, etc.)
     if (!origin) {
+      console.log('  ✅ CORS: Allowing request without origin');
       return callback(null, true);
     }
     
-    // Verificar si el origin está permitido
+    // Verificar coincidencia exacta
     if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.log(`CORS blocked origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
+      console.log(`  ✅ CORS: Allowing origin (exact match): ${origin}`);
+      return callback(null, true);
     }
+    
+    // Verificar wildcards (ej: https://*.vercel.app)
+    for (const allowedOrigin of allowedOrigins) {
+      if (allowedOrigin.includes('*')) {
+        const pattern = allowedOrigin.replace(/\*/g, '.*');
+        const regex = new RegExp(`^${pattern}$`);
+        if (regex.test(origin)) {
+          console.log(`  ✅ CORS: Allowing origin (wildcard match): ${origin} matches ${allowedOrigin}`);
+          return callback(null, true);
+        }
+      }
+    }
+    
+    console.log(`  ❌ CORS: Blocked origin: ${origin}`);
+    console.log(`  Allowed origins: ${allowedOrigins.join(', ')}`);
+    callback(new Error('Not allowed by CORS'));
   },
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
+  exposedHeaders: ["Content-Length", "Content-Type"],
   credentials: true,
   optionsSuccessStatus: 200, // Para navegadores legacy
+  preflightContinue: false,
 };
 
 app.use(cors(corsOptions));
+
+// Manejar preflight requests explícitamente
+app.options('*', cors(corsOptions));
 
 // Conectar DB
 connectDB();
