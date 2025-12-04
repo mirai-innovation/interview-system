@@ -212,9 +212,9 @@ Return the skills as a JSON object with a 'skills' array.`;
 export async function generateQuestions(skills) {
   try {
     const prompt = `
-Based on the following skills extracted from the CV, generate 10 interview questions in English:
-- 5 questions about hard skills.
-- 5 questions about soft skills.
+Based on the following skills extracted from the CV, generate 4 interview questions in English:
+- 2 questions about hard skills (technical skills).
+- 2 questions about soft skills (interpersonal skills).
 
 Skills found in the CV:
 ${skills.join(", ")}
@@ -222,20 +222,14 @@ ${skills.join(", ")}
 Respond ONLY in the following format, without adding anything else:
 1. Question about hard skill
 2. Question about hard skill
-3. Question about hard skill
-4. Question about hard skill
-5. Question about hard skill
-6. Question about soft skill
-7. Question about soft skill
-8. Question about soft skill
-9. Question about soft skill
-10. Question about soft skill
+3. Question about soft skill
+4. Question about soft skill
 `;
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 500,
+      max_tokens: 300,
       temperature: 0.7,
     });
 
@@ -244,7 +238,7 @@ Respond ONLY in the following format, without adding anything else:
       .map(q => q.replace(/^\d+\.\s*/, "").trim())
       .filter(q => q.length > 0);
 
-    return questions.slice(0, 10);
+    return questions.slice(0, 4);
   } catch (error) {
     console.error("Error in generateQuestions:", error);
     return [];

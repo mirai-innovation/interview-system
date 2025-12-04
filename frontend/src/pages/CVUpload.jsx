@@ -105,7 +105,7 @@ const CVUpload = () => {
 
     try {
       const response = await api.post('/users/analyze-cv');
-      setMessage(`CV analyzed successfully. ${response.data.questions?.length || 10} interview questions have been generated.`);
+      setMessage(`CV analyzed successfully. ${response.data.questions?.length || 4} interview questions have been generated.`);
       await fetchProfile();
     } catch (err) {
       setError(err.response?.data?.error || 'Error analyzing CV');
