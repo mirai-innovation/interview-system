@@ -6,6 +6,8 @@ package-lock.json
 .env
 .env.local
 .env.*.local
+frontend/.env
+frontend/.env.local
 
 # Build outputs
 dist/
