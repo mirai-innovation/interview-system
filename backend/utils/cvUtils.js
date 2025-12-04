@@ -1,4 +1,4 @@
-import { PDFExtract } from 'pdf.js-extract';
+import pdfParse from 'pdf-parse';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
@@ -12,7 +12,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Extracción de texto del PDF
+// Extracción de texto del PDF usando pdf-parse (compatible con serverless)
 export async function extractTextFromPdf(pdfPathOrUrl) {
   try {
     let pdfBuffer;
@@ -40,11 +40,9 @@ export async function extractTextFromPdf(pdfPathOrUrl) {
       pdfBuffer = fs.readFileSync(pdfPathOrUrl);
     }
     
-    const pdfExtract = new PDFExtract();
-    const data = await pdfExtract.extractBuffer(pdfBuffer, {});
-    const text = data.pages
-      .map(page => page.content.map(item => item.str).join(' '))
-      .join('\n');
+    // Usar pdf-parse que funciona mejor en entornos serverless
+    const data = await pdfParse(pdfBuffer);
+    const text = data.text;
     
     return text.trim();
   } catch (error) {
