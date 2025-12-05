@@ -122,7 +122,7 @@ const CVUpload = () => {
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">CV Analysis</h1>
           <p className="text-lg text-gray-600">
-            Upload your CV and let our AI analyze your skills and generate personalized interview questions
+            Upload your CV and let our system analyze your skills and generate personalized interview questions
           </p>
         </div>
 
@@ -277,7 +277,7 @@ const CVUpload = () => {
                 </svg>
               </div>
               <div className="flex-1">
-                <h2 className="text-2xl font-bold text-gray-900 mb-1">Analyze CV with AI</h2>
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">Analyze CV</h2>
                 <p className="text-gray-600">Extract skills and generate personalized interview questions</p>
               </div>
               <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">
@@ -303,7 +303,7 @@ const CVUpload = () => {
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
-                  Analyze CV with AI
+                  Analyze CV
                 </>
               )}
             </button>
@@ -356,7 +356,7 @@ const CVUpload = () => {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-gray-900">Skills Detected by AI</h3>
+                    <h3 className="text-xl font-bold text-gray-900">Skills Detected</h3>
                     <p className="text-sm text-gray-600">
                       {profile.skills.length} skills identified from your CV analysis
                     </p>

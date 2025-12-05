@@ -78,7 +78,7 @@ const Landing = () => {
           </h1>
           <p className="text-xl text-gray-600 mb-8">
             Complementary platform for the selection process of our academic programs.
-            Evaluate your competencies through AI-powered CV analysis, personalized interviews,
+            Evaluate your competencies through automated CV analysis, personalized interviews,
             and specialized assessments to become part of our excellence programs.
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
@@ -136,10 +136,10 @@ const Landing = () => {
               </svg>
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-4">
-              AI-Powered CV Analysis
+              Automated CV Analysis
             </h3>
             <p className="text-gray-600">
-              Upload your CV and our artificial intelligence system analyzes
+              Upload your CV and our system analyzes
               your skills, experience, and competencies to evaluate your profile
               as an applicant to our academic programs.
             </p>
@@ -157,7 +157,7 @@ const Landing = () => {
             </h3>
             <p className="text-gray-600">
               Answer questions specifically generated for you based on your CV.
-              Our AI evaluates your responses to determine your suitability
+              The system evaluates your responses to determine your suitability
               and competencies for our programs.
             </p>
           </div>
@@ -257,7 +257,7 @@ const Landing = () => {
                   </h3>
                   <p className="text-gray-600 text-lg">
                     Create your account as an applicant and upload your CV in PDF format.
-                    Our system will automatically analyze it with artificial intelligence
+                    Our system will automatically analyze it
                     to evaluate your initial profile.
                   </p>
                 </div>

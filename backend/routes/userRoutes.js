@@ -224,21 +224,58 @@ router.post("/transcribe-video", authMiddleware, videoUpload.single('video'), as
       tempFilePath = path.join(tempDir, `temp_${Date.now()}_${path.basename(req.file.key || 'video.webm')}`);
       console.log('🎥 [TRANSCRIBE] Temp file path:', tempFilePath);
       
-      const response = await axios({
-        method: 'GET',
-        url: req.file.location,
-        responseType: 'stream'
-      });
+      // Download from S3 with timeout and retry logic
+      let downloadSuccess = false;
+      let downloadAttempts = 0;
+      const maxDownloadAttempts = 3;
       
-      const writeStream = fs.createWriteStream(tempFilePath);
+      while (!downloadSuccess && downloadAttempts < maxDownloadAttempts) {
+        try {
+          downloadAttempts++;
+          console.log(`🎥 [TRANSCRIBE] Download attempt ${downloadAttempts}/${maxDownloadAttempts}`);
+          
+          const response = await axios({
+            method: 'GET',
+            url: req.file.location,
+            responseType: 'stream',
+            timeout: 30000, // 30 seconds timeout for download
+          });
+          
+          const writeStream = fs.createWriteStream(tempFilePath);
+          
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              writeStream.destroy();
+              reject(new Error('Download timeout'));
+            }, 30000);
+            
+            response.data.pipe(writeStream);
+            response.data.on('error', (err) => {
+              clearTimeout(timeout);
+              reject(err);
+            });
+            writeStream.on('finish', () => {
+              clearTimeout(timeout);
+              resolve();
+            });
+            writeStream.on('error', (err) => {
+              clearTimeout(timeout);
+              reject(err);
+            });
+          });
+          
+          downloadSuccess = true;
+          console.log('✅ [TRANSCRIBE] File downloaded successfully');
+        } catch (downloadError) {
+          console.error(`❌ [TRANSCRIBE] Download attempt ${downloadAttempts} failed:`, downloadError.message);
+          if (downloadAttempts >= maxDownloadAttempts) {
+            throw new Error(`Failed to download video from S3 after ${maxDownloadAttempts} attempts: ${downloadError.message}`);
+          }
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 1000 * downloadAttempts));
+        }
+      }
       
-      await new Promise((resolve, reject) => {
-        response.data.pipe(writeStream);
-        response.data.on('error', reject);
-        writeStream.on('finish', resolve);
-      });
-      
-      console.log('✅ [TRANSCRIBE] File downloaded successfully');
       filePathToTranscribe = tempFilePath;
     } else {
       // Para almacenamiento local, usar el path directamente
@@ -352,10 +389,18 @@ router.post("/submit-interview", authMiddleware, videoUpload.any(), async (req, 
     console.log('📝 [SUBMIT INTERVIEW] Total questions:', allQuestions.length);
     console.log('📝 [SUBMIT INTERVIEW] Total answers:', textAnswers.length);
     console.log('📝 [SUBMIT INTERVIEW] Has video:', hasVideo);
+    console.log('📝 [SUBMIT INTERVIEW] Generated questions count:', generatedQuestions.length);
+    console.log('📝 [SUBMIT INTERVIEW] Default questions count:', defaultQuestions.length);
 
+    // Validate that we have the correct number of answers
     if (textAnswers.length !== allQuestions.length) {
+      console.error('❌ [SUBMIT INTERVIEW] Mismatch detected:');
+      console.error('   - Expected answers:', allQuestions.length);
+      console.error('   - Received answers:', textAnswers.length);
+      console.error('   - Generated questions:', generatedQuestions.length);
+      console.error('   - Default questions:', defaultQuestions.length);
       return res.status(400).json({ 
-        message: "Number of answers does not match the number of questions." 
+        message: `Number of answers (${textAnswers.length}) does not match the number of questions (${allQuestions.length}). Please make sure all ${allQuestions.length} text questions are answered.` 
       });
     }
 

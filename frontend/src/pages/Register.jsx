@@ -31,7 +31,9 @@ const Register = () => {
     try {
       const result = await api.post('/auth/register', formData);
       if (result.data) {
-        alert('Registration successful. Your account will be activated by an administrator.');
+        // ACTIVACIÓN POR ADMIN - COMENTADO: Mensaje actualizado para registro automático
+        // alert('Registration successful. Your account will be activated by an administrator.');
+        alert('Registration successful. You can now log in.');
         navigate('/login');
       }
     } catch (err) {

@@ -25,11 +25,12 @@ export const authMiddleware = async (req, res, next) => {
       return res.status(404).json({ message: "Usuario no encontrado" });
     }
     
-    if (!user.isActive) {
-      return res.status(403).json({ 
-        message: "Tu cuenta está inactiva." 
-      });
-    }
+    // ACTIVACIÓN POR ADMIN - COMENTADO: Se permite acceso sin verificar isActive
+    // if (!user.isActive) {
+    //   return res.status(403).json({ 
+    //     message: "Tu cuenta está inactiva." 
+    //   });
+    // }
     
     next();
   } catch (error) {
@@ -65,7 +66,9 @@ router.post("/register", async (req, res) => {
       gender,
       academic_level,
       program,
-      isActive: false,
+      // ACTIVACIÓN POR ADMIN - COMENTADO: Las cuentas nuevas se crean activas automáticamente
+      // isActive: false,  // Descomentar esta línea para reactivar la activación por admin
+      isActive: true,  // Cuentas activas automáticamente al registrarse
     };
 
     const user = await User.create(userData);
@@ -105,11 +108,12 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Contraseña incorrecta" });
     }
 
-    if (!user.isActive) {
-      return res.status(403).json({ 
-        message: "Tu cuenta está inactiva. Contacta al administrador." 
-      });
-    }
+    // ACTIVACIÓN POR ADMIN - COMENTADO: Se permite login sin verificar isActive
+    // if (!user.isActive) {
+    //   return res.status(403).json({ 
+    //     message: "Tu cuenta está inactiva. Contacta al administrador." 
+    //   });
+    // }
 
     const token = jwt.sign(
       { userId: user._id }, 

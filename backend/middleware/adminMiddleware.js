@@ -14,11 +14,12 @@ export const adminMiddleware = async (req, res, next) => {
       });
     }
 
-    if (!user.isActive) {
-      return res.status(403).json({ 
-        message: "Tu cuenta está inactiva." 
-      });
-    }
+    // ACTIVACIÓN POR ADMIN - COMENTADO: Se permite acceso de admin sin verificar isActive
+    // if (!user.isActive) {
+    //   return res.status(403).json({ 
+    //     message: "Tu cuenta está inactiva." 
+    //   });
+    // }
 
     next();
   } catch (error) {

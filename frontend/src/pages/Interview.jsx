@@ -138,9 +138,15 @@ const Interview = () => {
         // Load saved answers if they exist
         if (response.data.interviewResponses && Array.isArray(response.data.interviewResponses)) {
           const savedAnswers = [...response.data.interviewResponses];
-          // Ensure array has correct length
-          while (savedAnswers.length < combinedQuestions.length) {
-            savedAnswers.push('');
+          // Ensure array has exactly the correct length (trim if too long, pad if too short)
+          if (savedAnswers.length > combinedQuestions.length) {
+            // Trim to correct length if it has extra elements
+            savedAnswers.splice(combinedQuestions.length);
+          } else {
+            // Pad with empty strings if it's too short
+            while (savedAnswers.length < combinedQuestions.length) {
+              savedAnswers.push('');
+            }
           }
           setAnswers(savedAnswers);
           
@@ -195,8 +201,14 @@ const Interview = () => {
   // Auto-save answers to backend
   const saveAnswersAuto = async (answersToSave) => {
     try {
+      // Ensure we only save text answers (exactly allQuestions.length)
+      const textAnswersToSave = answersToSave.slice(0, allQuestions.length);
+      // Pad if necessary to ensure correct length
+      while (textAnswersToSave.length < allQuestions.length) {
+        textAnswersToSave.push('');
+      }
       await api.post('/users/save-interview-progress', {
-        answers: answersToSave,
+        answers: textAnswersToSave,
         currentQuestionIndex: currentQuestionIndex
       });
     } catch (error) {
@@ -443,16 +455,19 @@ const Interview = () => {
     }
   }, [currentQuestionIndex, isRecording]);
 
-  const transcribeVideo = async () => {
+  const transcribeVideo = async (retryCount = 0) => {
     if (!videoBlob || isTranscribing) return;
 
     // Store current question index to prevent transcription for wrong question
     const questionIndexAtStart = currentQuestionIndex;
+    const MAX_RETRIES = 2; // Maximum 2 retries (3 total attempts)
 
     try {
       setIsTranscribing(true);
       setError('');
-      setMessage('Transcribing audio with Whisper AI...');
+      setMessage(retryCount > 0 
+        ? `Transcribing audio... (Attempt ${retryCount + 1}/${MAX_RETRIES + 1})`
+        : 'Transcribing audio...');
       
       const formData = new FormData();
       const videoFile = new File([videoBlob], `recording_${Date.now()}.webm`, {
@@ -460,11 +475,18 @@ const Interview = () => {
       });
       formData.append('video', videoFile);
 
-      const response = await api.post('/users/transcribe-video', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // Add timeout of 60 seconds for transcription
+      const response = await Promise.race([
+        api.post('/users/transcribe-video', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 60000, // 60 seconds timeout
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout')), 60000)
+        )
+      ]);
 
       // Only update if we're still on the same question
       if (currentQuestionIndex === questionIndexAtStart) {
@@ -483,9 +505,31 @@ const Interview = () => {
       }
     } catch (err) {
       console.error('Error transcribing:', err);
+      
       // Only update if we're still on the same question
       if (currentQuestionIndex === questionIndexAtStart) {
-        setError('Error transcribing audio. You can still type your answer manually.');
+        // Check if it's a network error or timeout and we haven't exceeded retries
+        const isNetworkError = err.code === 'ECONNABORTED' || 
+                              err.code === 'ERR_NETWORK' || 
+                              err.message === 'Request timeout' ||
+                              !err.response;
+        
+        if (isNetworkError && retryCount < MAX_RETRIES) {
+          // Retry after a short delay
+          console.log(`Retrying transcription (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+          setIsTranscribing(false);
+          setTimeout(() => {
+            if (currentQuestionIndex === questionIndexAtStart && videoBlob) {
+              transcribeVideo(retryCount + 1);
+            }
+          }, 2000); // Wait 2 seconds before retry
+          return;
+        }
+        
+        // If retries exhausted or not a network error, show error
+        setError(isNetworkError 
+          ? 'Network error during transcription. Please check your connection and try recording again.'
+          : 'Error transcribing audio. You can still type your answer manually.');
         setMessage('');
         setIsTranscribing(false);
         // Still allow review mode even if transcription fails
@@ -552,8 +596,19 @@ const Interview = () => {
       // Prepare FormData for multipart/form-data submission
       const formData = new FormData();
       
+      // Only send text answers (exactly allQuestions.length, not including video question)
+      // Ensure the answers array matches the number of text questions
+      const textAnswers = answers.slice(0, allQuestions.length);
+      
+      // Validate that we have the correct number of answers
+      if (textAnswers.length !== allQuestions.length) {
+        setError(`Error: Expected ${allQuestions.length} text answers, but found ${textAnswers.length}. Please make sure all questions are answered.`);
+        setSubmitting(false);
+        return;
+      }
+      
       // Add text answers as JSON string
-      formData.append('answers', JSON.stringify(answers));
+      formData.append('answers', JSON.stringify(textAnswers));
       
       // Add final video question video if available (only for the final video question)
       if (videoBlob && isVideoQuestion) {
@@ -971,7 +1026,7 @@ const Interview = () => {
                       </div>
                       <div>
                         <p className="text-2xl font-bold text-white mb-2">🔄 Transcribing Audio...</p>
-                        <p className="text-lg text-blue-100">Using Whisper AI to convert your speech to text</p>
+                        <p className="text-lg text-blue-100">Converting your speech to text</p>
                         <p className="text-sm text-blue-200 mt-2">Please wait, this may take a few seconds</p>
                       </div>
                     </div>

@@ -516,21 +516,47 @@ export const evaluateMultipleIntelligences = (responses) => {
 
 // Transcribe audio from video using Whisper API
 export async function transcribeVideoAudio(filePath) {
-  try {
-    // Create a readable stream from the file for OpenAI
-    const fileStream = fs.createReadStream(filePath);
-    
-    const transcription = await openai.audio.transcriptions.create({
-      file: fileStream,
-      model: 'whisper-1',
-      language: 'en',
-      response_format: 'text'
-    });
-
-    return transcription.trim();
-  } catch (error) {
-    console.error('Error transcribing audio with Whisper:', error);
-    throw new Error('Failed to transcribe audio');
+  let transcriptionAttempts = 0;
+  const maxTranscriptionAttempts = 3;
+  
+  while (transcriptionAttempts < maxTranscriptionAttempts) {
+    try {
+      transcriptionAttempts++;
+      console.log(`🎤 [WHISPER] Transcription attempt ${transcriptionAttempts}/${maxTranscriptionAttempts}`);
+      
+      // Create a readable stream from the file for OpenAI
+      const fileStream = fs.createReadStream(filePath);
+      
+      // Add timeout wrapper for Whisper API call
+      const transcriptionPromise = openai.audio.transcriptions.create({
+        file: fileStream,
+        model: 'whisper-1',
+        language: 'en',
+        response_format: 'text'
+      });
+      
+      // Race between transcription and timeout (60 seconds)
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Whisper API timeout')), 60000)
+      );
+      
+      const transcription = await Promise.race([transcriptionPromise, timeoutPromise]);
+      
+      console.log(`✅ [WHISPER] Transcription completed successfully`);
+      return transcription.trim();
+    } catch (error) {
+      console.error(`❌ [WHISPER] Transcription attempt ${transcriptionAttempts} failed:`, error.message);
+      
+      // If it's the last attempt, throw the error
+      if (transcriptionAttempts >= maxTranscriptionAttempts) {
+        throw new Error(`Failed to transcribe audio after ${maxTranscriptionAttempts} attempts: ${error.message}`);
+      }
+      
+      // Wait before retry (exponential backoff)
+      const waitTime = 1000 * Math.pow(2, transcriptionAttempts - 1);
+      console.log(`⏳ [WHISPER] Waiting ${waitTime}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
   }
 }
 
