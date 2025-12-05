@@ -408,9 +408,13 @@ const Interview = () => {
 
   // Transcribe video when blob is ready
   useEffect(() => {
+    // Calculate if this is a video question (must be done inside useEffect to avoid initialization error)
+    const isVideoQuestion = currentQuestionIndex !== undefined && allQuestions.length > 0 && currentQuestionIndex >= allQuestions.length;
+    
     // Only transcribe if we have a video blob, not recording, not already transcribing, not in review mode, and answer not saved
+    // IMPORTANT: Skip transcription for video-only question (final question)
     // Also check that we're not in the middle of changing questions
-    if (videoBlob && !isReviewMode && !isRecording && !isTranscribing && !answerSaved && currentQuestionIndex !== undefined) {
+    if (videoBlob && !isReviewMode && !isRecording && !isTranscribing && !answerSaved && currentQuestionIndex !== undefined && !isVideoQuestion) {
       // Small delay to ensure state is stable
       const timeoutId = setTimeout(() => {
         if (videoBlob && !isTranscribing && !answerSaved) {
@@ -420,7 +424,12 @@ const Interview = () => {
       
       return () => clearTimeout(timeoutId);
     }
-  }, [videoBlob, isRecording, isReviewMode, isTranscribing, answerSaved, currentQuestionIndex]);
+    
+    // For video-only question, directly enter review mode without transcription
+    if (videoBlob && isVideoQuestion && !isReviewMode && !isRecording && !isTranscribing) {
+      setIsReviewMode(true);
+    }
+  }, [videoBlob, isRecording, isReviewMode, isTranscribing, answerSaved, currentQuestionIndex, allQuestions.length]);
 
   // Reset recording states when question changes
   useEffect(() => {
@@ -810,473 +819,387 @@ const Interview = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-mesh-gradient relative">
       <Navbar />
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Interview</h1>
-          <p className="text-lg text-gray-600">
-            {isVideoQuestion 
-              ? `Video Introduction (Final Question)`
-              : `Question ${currentQuestionIndex + 1} of ${allQuestions.length + 1}`}
-          </p>
-        </div>
-
-        {error && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded mb-6">
-            <p>{error}</p>
-          </div>
-        )}
-
-        {message && (
-          <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded mb-6">
-            <p>{message}</p>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-lg p-8">
-          {/* Progress Bar */}
+      <div className="container mx-auto px-4 py-6 relative z-10">
+        {/* Centered Container */}
+        <div className="max-w-4xl mx-auto">
+          {/* Progress Indicator - Top */}
           <div className="mb-6">
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>Progress</span>
-              <span>{Math.round(((isVideoQuestion ? allQuestions.length + 1 : currentQuestionIndex + 1) / (allQuestions.length + 1)) * 100)}%</span>
+            <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+              <span className="font-medium">
+                {isVideoQuestion 
+                  ? `Video Introduction (Final Question)`
+                  : `Question ${currentQuestionIndex + 1} of ${allQuestions.length + 1}`}
+              </span>
+              <span className="font-semibold">
+                {Math.round(((isVideoQuestion ? allQuestions.length + 1 : currentQuestionIndex + 1) / (allQuestions.length + 1)) * 100)}%
+              </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+            <div className="w-full bg-white/20 backdrop-blur-sm rounded-full h-2 overflow-hidden">
               <div
-                className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 h-2 rounded-full transition-all duration-500"
                 style={{ width: `${((isVideoQuestion ? allQuestions.length + 1 : currentQuestionIndex + 1) / (allQuestions.length + 1)) * 100}%` }}
               ></div>
             </div>
-            {/* Questions Status Overview */}
-            {!isVideoQuestion && allQuestions.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {allQuestions.map((_, index) => {
-                  const hasAnswer = answers[index] && answers[index].trim() !== '';
-                  return (
-                    <div
-                      key={index}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                        index === currentQuestionIndex
-                          ? 'ring-4 ring-blue-500 scale-110'
-                          : ''
-                      } ${
-                        hasAnswer
-                          ? 'bg-green-500 text-white'
-                          : 'bg-gray-300 text-gray-600'
-                      }`}
-                      title={`Question ${index + 1}: ${hasAnswer ? 'Answered' : 'Not answered'}`}
-                    >
-                      {hasAnswer ? '✓' : index + 1}
-                    </div>
-                  );
-                })}
-                {/* Video question indicator */}
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                    isVideoQuestion
-                      ? 'ring-4 ring-blue-500 scale-110'
-                      : ''
-                  } bg-purple-500 text-white`}
-                  title="Video Introduction"
-                >
-                  🎥
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Timer */}
-          {!isVideoQuestion && (
-            <div className="mb-6 flex items-center justify-between bg-blue-50 p-4 rounded-lg">
-              <div>
-                <p className="text-sm text-gray-600">Time remaining for this question:</p>
-                <p className={`text-2xl font-bold ${timeRemaining < 60 ? 'text-red-600' : 'text-blue-600'}`}>
-                  {formatTime(timeRemaining)}
-                </p>
-              </div>
+          {/* Error/Message Alerts */}
+          {error && (
+            <div className="glass-card bg-red-50/80 border-red-200 text-red-700 p-4 rounded-xl mb-6">
+              <p>{error}</p>
             </div>
           )}
 
-          {/* Question */}
-          <div className="mb-6">
-            <div className="flex items-center gap-3 mb-4">
-              <label 
-                className="block text-gray-900 text-xl font-bold select-none flex-1"
-                style={{ 
-                  userSelect: 'none',
-                  WebkitUserSelect: 'none',
-                  MozUserSelect: 'none',
-                  msUserSelect: 'none'
-                }}
-                onContextMenu={(e) => e.preventDefault()}
-                onCopy={(e) => e.preventDefault()}
-                onCut={(e) => e.preventDefault()}
-              >
-                {isVideoQuestion ? currentQuestion : `${currentQuestionIndex + 1}. ${currentQuestion}`}
-              </label>
-              {/* Answer Status Indicator */}
-              {!isVideoQuestion && (
-                <div className="flex-shrink-0">
-                  {answers[currentQuestionIndex] && answers[currentQuestionIndex].trim() !== '' ? (
-                    <div className="flex items-center gap-2 bg-green-100 border-2 border-green-500 rounded-full px-4 py-2">
-                      <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-green-800 font-bold text-sm">Answer Saved</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 bg-yellow-100 border-2 border-yellow-500 rounded-full px-4 py-2">
-                      <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-yellow-800 font-bold text-sm">No Answer</span>
-                    </div>
-                  )}
-                </div>
-              )}
+          {message && (
+            <div className="glass-card bg-green-50/80 border-green-200 text-green-700 p-4 rounded-xl mb-6">
+              <p>{message}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Question Card (Teleprompter Style) */}
+            <div className="glass-card bg-white/60 backdrop-blur-md border border-white/40 rounded-3xl p-6 mb-6 shadow-xl">
+              <div className="flex items-start justify-between gap-4">
+                <label 
+                  className="block text-gray-900 text-xl font-semibold select-none flex-1 leading-relaxed"
+                  style={{ 
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    MozUserSelect: 'none',
+                    msUserSelect: 'none'
+                  }}
+                  onContextMenu={(e) => e.preventDefault()}
+                  onCopy={(e) => e.preventDefault()}
+                  onCut={(e) => e.preventDefault()}
+                >
+                  {isVideoQuestion ? currentQuestion : `${currentQuestionIndex + 1}. ${currentQuestion}`}
+                </label>
+                {/* Timer Badge - Integrated in Question Card */}
+                {!isVideoQuestion && (
+                  <div className={`flex-shrink-0 flex items-center gap-2 rounded-full px-4 py-2 font-bold text-lg ${
+                    timeRemaining < 60 
+                      ? 'bg-red-100/80 text-red-700 border border-red-300' 
+                      : 'bg-blue-100/80 text-blue-700 border border-blue-300'
+                  }`}>
+                    <span>⏱️</span>
+                    <span>{formatTime(timeRemaining)}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {isVideoQuestion ? (
-              <div className="space-y-4">
-                {/* Video Preview/Recording */}
-                <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                  {recordedVideo ? (
-                    <video
-                      src={recordedVideo}
-                      controls
-                      className="w-full h-full object-contain"
-                    />
-                  ) : (
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      muted
-                      className="w-full h-full object-contain"
-                      style={{ display: isRecording ? 'block' : 'none' }}
-                    />
-                  )}
-                  {!isRecording && !recordedVideo && (
-                    <div className="absolute inset-0 flex items-center justify-center text-white">
-                      <div className="text-center">
-                        <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                        <p className="text-lg">Camera preview will appear here</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Recording Controls */}
-                <div className="flex items-center justify-center gap-4">
-                  {!isRecording && !recordedVideo && (
-                    <button
-                      type="button"
-                      onClick={startUnifiedRecording}
-                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2"
-                    >
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                      </svg>
-                      Start Recording
-                    </button>
-                  )}
-
-                  {isRecording && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={stopUnifiedRecording}
-                        className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2"
-                      >
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
-                        </svg>
-                        Stop Recording ({60 - recordingTime}s)
-                      </button>
-                    </>
-                  )}
-
-                  {recordedVideo && (
-                    <button
-                      type="button"
-                      onClick={retakeRecording}
-                      className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-semibold transition"
-                    >
-                      Retake Video
-                    </button>
-                  )}
-                </div>
-
-                <p className="text-sm text-gray-600 text-center">
-                  Maximum recording time: 1 minute. Please speak about your projects and skills.
-                </p>
+            {/* Video Container (The Lens) - Renderizado Condicional Estricto */}
+            {isReviewMode ? (
+              /* Estado: Review - Solo muestra el video grabado */
+              <div className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-white/20" style={{ aspectRatio: '16/9' }}>
+                {recordedVideo && (
+                  <video
+                    src={recordedVideo}
+                    controls
+                    className="w-full h-full object-contain bg-black"
+                  />
+                )}
               </div>
             ) : (
-              <div className="space-y-4">
-                {/* Transcription Status - Show prominently when transcribing (BEFORE review mode) */}
-                {isTranscribing && !isReviewMode && (
-                  <div className="bg-gradient-to-r from-blue-500 to-purple-500 border-4 border-blue-300 rounded-xl p-8 text-center mb-6 shadow-2xl animate-pulse">
-                    <div className="flex flex-col items-center gap-4">
+              /* Estado: Recording/Idle - Solo muestra la cámara */
+              <div className={`relative rounded-3xl overflow-hidden shadow-2xl transition-all duration-300 ${
+                isRecording 
+                  ? 'ring-4 ring-red-500/50 animate-pulse border-4 border-red-400' 
+                  : 'border-4 border-white/20'
+              }`} style={{ aspectRatio: '16/9' }}>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  muted
+                  className="w-full h-full object-contain bg-black"
+                  style={{ display: isRecording ? 'block' : 'none' }}
+                />
+                {!isRecording && (
+                  <div className="absolute inset-0 flex items-center justify-center text-white bg-black/50 backdrop-blur-sm">
+                    <div className="text-center">
+                      <svg className="w-20 h-20 mx-auto mb-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      <p className="text-lg text-white/80">Camera preview will appear here</p>
+                    </div>
+                  </div>
+                )}
+                {/* Recording Indicator */}
+                {isRecording && (
+                  <div className="absolute top-4 left-4 flex items-center gap-2 glass-card bg-red-500/90 backdrop-blur-md px-4 py-2 rounded-full">
+                    <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                    <span className="text-white font-bold text-sm">REC</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Transcription Status - Overlay sutil y minimalista (pequeño, centrado sobre el video) */}
+            {isTranscribing && !isReviewMode && !isVideoQuestion && (
+              <div className="relative -mt-[calc(16/9*100%)] mb-6">
+                <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
+                  <div className="glass-card bg-white/90 backdrop-blur-md border border-white/40 rounded-2xl px-6 py-4 text-center shadow-xl">
+                    <div className="flex flex-col items-center gap-2">
                       <div className="relative">
-                        <div className="animate-spin rounded-full h-16 w-16 border-4 border-white border-t-transparent"></div>
-                        <svg className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
+                        <svg className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
                         </svg>
                       </div>
                       <div>
-                        <p className="text-2xl font-bold text-white mb-2">🔄 Transcribing Audio...</p>
-                        <p className="text-lg text-blue-100">Converting your speech to text</p>
-                        <p className="text-sm text-blue-200 mt-2">Please wait, this may take a few seconds</p>
+                        <p className="text-xs font-semibold text-gray-700">Transcribing...</p>
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
+              </div>
+            )}
 
-                {/* Answer Saved Confirmation */}
-                {answerSaved && !isReviewMode && !isTranscribing && (
-                  <div className="bg-gradient-to-r from-green-500 to-emerald-500 border-4 border-green-300 rounded-xl p-6 text-center mb-6 shadow-2xl">
-                    <div className="flex flex-col items-center gap-3">
-                      <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <div>
-                        <p className="text-2xl font-bold text-white mb-2">✓ Answer Saved Successfully!</p>
-                        <p className="text-lg text-green-100">Your answer has been saved. You can now proceed to the next question.</p>
-                      </div>
-                    </div>
+            {/* Answer Saved Confirmation - Alto contraste */}
+            {answerSaved && !isReviewMode && !isTranscribing && (
+              <div className="glass-card bg-green-100 border-2 border-green-500 rounded-3xl p-6 text-center mb-6 shadow-2xl">
+                <div className="flex flex-col items-center gap-3">
+                  <svg className="w-16 h-16 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <div>
+                    <p className="text-2xl font-bold text-green-800 mb-2">✓ Answer Saved Successfully!</p>
+                    <p className="text-lg text-green-700">Your answer has been saved. You can now proceed to the next question.</p>
                   </div>
-                )}
+                </div>
+              </div>
+            )}
 
-                {/* Unified Recording Interface */}
-                {!isReviewMode && !isTranscribing && !answerSaved ? (
-                  <>
-                    {/* Video Preview/Recording */}
-                    <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        muted
-                        className="w-full h-full object-contain"
-                        style={{ display: isRecording ? 'block' : 'none' }}
-                      />
-                      {!isRecording && !recordedVideo && (
-                        <div className="absolute inset-0 flex items-center justify-center text-white">
-                          <div className="text-center">
-                            <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                            <p className="text-lg">Camera preview will appear here</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Recording Controls */}
-                    <div className="flex flex-col items-center gap-4">
-                      {!isRecording && !recordedVideo && (
+            {/* Control Dock (Floating Action Bar) - State Machine Unificado */}
+            {(() => {
+              // Si es Video Question, usar controles especiales
+              if (isVideoQuestion) {
+                // Estado: Review Mode para video question
+                if (isReviewMode && !isTranscribing) {
+                  return (
+                    <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-3xl p-6 shadow-2xl -mt-8 relative z-20">
+                      <div className="flex items-center justify-center gap-4">
                         <button
                           type="button"
-                          onClick={startUnifiedRecording}
-                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-lg font-semibold transition shadow-lg hover:shadow-xl flex items-center gap-3 text-lg"
+                          onClick={handlePreviousQuestion}
+                          className="glass-card bg-white/40 hover:bg-white/60 border border-white/30 rounded-full px-6 py-3 font-medium text-gray-700 transition-all hover:scale-105"
                         >
-                          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                          </svg>
-                          Start Recording (Video + Voice)
+                          Previous
                         </button>
-                      )}
-
-                      {isRecording && (
-                        <div className="w-full space-y-4">
-                          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 text-center">
-                            <div className="flex items-center justify-center gap-3 mb-2">
-                              <div className="w-4 h-4 bg-red-600 rounded-full animate-pulse"></div>
-                              <span className="text-xl font-bold text-red-600">
-                                Recording... {Math.floor((60 - recordingTime) / 60)}:{(60 - recordingTime) % 60 < 10 ? '0' : ''}{Math.abs((60 - recordingTime) % 60)}
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-600">
-                              Speak clearly. Your speech is being transcribed automatically.
-                            </p>
-                          </div>
-                          
-                          {/* Live transcription preview */}
-                          {transcribedText && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                              <p className="text-sm font-semibold text-blue-800 mb-2">Live Transcription:</p>
-                              <p className="text-gray-700">{transcribedText}</p>
-                            </div>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={stopUnifiedRecording}
-                            className="w-full bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2"
-                          >
-                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
-                            </svg>
-                            Stop Recording
-                          </button>
-                        </div>
-                      )}
-
-                      {recordedVideo && !isReviewMode && (
                         <button
                           type="button"
                           onClick={retakeRecording}
-                          className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-semibold transition"
+                          className="glass-card bg-white/40 hover:bg-white/60 border border-white/30 text-gray-700 rounded-full px-6 py-3 font-semibold transition-all hover:scale-105"
                         >
-                          Retake Recording
+                          Retake
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={submitting || !recordedVideo}
+                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full px-8 py-3 font-semibold transition shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {submitting ? 'Submitting...' : 'Submit Interview'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+                
+                // Estado: Recording/Idle para video question
+                return (
+                  <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-3xl p-6 shadow-2xl -mt-8 relative z-20">
+                    <div className="flex items-center justify-center gap-4">
+                      <button
+                        type="button"
+                        onClick={handlePreviousQuestion}
+                        className="glass-card bg-white/40 hover:bg-white/60 border border-white/30 rounded-full px-6 py-3 font-medium text-gray-700 transition-all hover:scale-105"
+                      >
+                        Previous
+                      </button>
+
+                      {!isRecording && !recordedVideo ? (
+                        <button
+                          type="button"
+                          onClick={startUnifiedRecording}
+                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full w-20 h-20 flex items-center justify-center shadow-xl hover:shadow-2xl transition-all hover:scale-110"
+                        >
+                          <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      ) : isRecording ? (
+                        <button
+                          type="button"
+                          onClick={stopUnifiedRecording}
+                          className="bg-red-600 hover:bg-red-700 text-white rounded-full w-20 h-20 flex items-center justify-center shadow-xl hover:shadow-2xl transition-all hover:scale-110 animate-pulse"
+                        >
+                          <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      ) : null}
+
+                      {/* Recording Time Display */}
+                      {isRecording && (
+                        <div className="text-center">
+                          <p className="text-sm text-gray-600 font-medium">
+                            {Math.floor((60 - recordingTime) / 60)}:{(60 - recordingTime) % 60 < 10 ? '0' : ''}{Math.abs((60 - recordingTime) % 60)} / 1:00
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              // Para preguntas de texto (no video question)
+              // Estado: Answer Saved - Solo botón Next
+              if (answerSaved && !isReviewMode && !isTranscribing) {
+                return (
+                  <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-3xl p-6 shadow-2xl -mt-8 relative z-20">
+                    <div className="flex items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={handleNextQuestion}
+                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full px-8 py-4 font-bold text-lg shadow-xl hover:shadow-2xl transition-all hover:scale-105 flex items-center gap-3"
+                      >
+                        <span>Next Question</span>
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Estado: Review Mode - Botones Retake y Keep
+              if (isReviewMode && !isTranscribing) {
+                return (
+                  <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-3xl p-6 shadow-2xl -mt-8 relative z-20">
+                    <div className="flex items-center justify-center gap-4">
+                      <button
+                        type="button"
+                        onClick={retakeRecording}
+                        className="glass-card bg-white/40 hover:bg-white/60 border border-white/30 text-gray-700 rounded-full px-6 py-3 font-semibold transition-all hover:scale-105"
+                      >
+                        Retake Recording
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const answerToSave = answers[currentQuestionIndex] || transcribedText || '';
+                          if (answerToSave) {
+                            handleAnswerChange(answerToSave);
+                          }
+                          setAnswerSaved(true);
+                          setIsTranscribing(false);
+                          setIsReviewMode(false);
+                          setVideoBlob(null);
+                        }}
+                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full px-8 py-3 font-semibold transition shadow-lg hover:shadow-xl"
+                      >
+                        Keep This Answer
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Estado: Recording/Idle - Botones de grabación
+              if (!isReviewMode && !isTranscribing && !answerSaved) {
+                return (
+                  <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-3xl p-6 shadow-2xl -mt-8 relative z-20">
+                    <div className="flex items-center justify-center gap-4">
+                      {/* Main Record/Stop Button (Center) */}
+                      {!isRecording && !recordedVideo ? (
+                        <button
+                          type="button"
+                          onClick={startUnifiedRecording}
+                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full w-20 h-20 flex items-center justify-center shadow-xl hover:shadow-2xl transition-all hover:scale-110"
+                        >
+                          <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      ) : isRecording ? (
+                        <button
+                          type="button"
+                          onClick={stopUnifiedRecording}
+                          className="bg-red-600 hover:bg-red-700 text-white rounded-full w-20 h-20 flex items-center justify-center shadow-xl hover:shadow-2xl transition-all hover:scale-110 animate-pulse"
+                        >
+                          <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      ) : null}
+
+                      {/* Next Button (Right) - Solo visible si hay respuesta */}
+                      {answers[currentQuestionIndex] && answers[currentQuestionIndex].trim() !== '' && (
+                        <button
+                          type="button"
+                          onClick={handleNextQuestion}
+                          className="glass-card bg-white/40 hover:bg-white/60 border border-white/30 rounded-full px-6 py-3 font-medium text-gray-700 transition-all hover:scale-105"
+                        >
+                          Next
                         </button>
                       )}
                     </div>
 
-                    <p className="text-sm text-gray-600 text-center">
-                      {isRecording 
-                        ? 'Recording will automatically stop after 1 minute. You can also stop manually.'
-                        : 'Click "Start Recording" to begin. The recording will capture both video and audio, and transcribe your speech automatically.'}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    {/* Review Mode - Show recorded video and editable transcription */}
-                    {!isTranscribing && (
-                      <>
-                        <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 mb-4">
-                          <div className="flex items-center gap-2 mb-2">
-                            <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            <p className="font-semibold text-green-800">Recording Complete! Review and edit your transcribed answer below.</p>
-                          </div>
-                        </div>
-
-                        {/* Video Preview */}
-                        {recordedVideo && (
-                          <div className="mb-4">
-                            <video
-                              src={recordedVideo}
-                              controls
-                              className="w-full rounded-lg"
-                              style={{ aspectRatio: '16/9' }}
-                            />
-                          </div>
-                        )}
-
-                        {/* Editable Transcription */}
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Review and edit your transcribed answer:
-                          </label>
-                          <textarea
-                            value={answers[currentQuestionIndex] || transcribedText}
-                            onChange={(e) => handleAnswerChange(e.target.value)}
-                            onPaste={handlePaste}
-                            className="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline focus:ring-2 focus:ring-green-500"
-                            style={{ 
-                              userSelect: 'text',
-                              WebkitUserSelect: 'text',
-                              MozUserSelect: 'text',
-                              msUserSelect: 'text'
-                            }}
-                            rows="8"
-                            required
-                            placeholder="Your transcribed answer will appear here. You can edit any typos or mistakes..."
-                          />
-                          <p className="text-xs text-gray-500 mt-2">
-                            Please review the transcription and correct any errors. The video recording is saved and will be submitted with your answer.
-                          </p>
-                        </div>
-
-                        <div className="flex gap-3">
-                          <button
-                            type="button"
-                            onClick={retakeRecording}
-                            className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-semibold transition"
-                          >
-                            Retake Recording
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              // Ensure the answer is saved from transcribed text or current answer
-                              const answerToSave = answers[currentQuestionIndex] || transcribedText || '';
-                              if (answerToSave) {
-                                handleAnswerChange(answerToSave);
-                              }
-                              // Mark answer as saved and exit review mode
-                              setAnswerSaved(true);
-                              setIsTranscribing(false);
-                              setIsReviewMode(false);
-                              // Clear video blob to prevent re-transcription
-                              setVideoBlob(null);
-                            }}
-                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition"
-                          >
-                            Keep This Answer
-                          </button>
-                        </div>
-                      </>
+                    {/* Recording Time Display */}
+                    {isRecording && (
+                      <div className="mt-4 text-center">
+                        <p className="text-sm text-gray-600 font-medium">
+                          Recording: {Math.floor((60 - recordingTime) / 60)}:{(60 - recordingTime) % 60 < 10 ? '0' : ''}{Math.abs((60 - recordingTime) % 60)} / 1:00
+                        </p>
+                      </div>
                     )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+                  </div>
+                );
+              }
 
-          {/* Navigation Buttons */}
-          <div className="flex justify-between items-center mt-6">
-            <button
-              type="button"
-              onClick={handlePreviousQuestion}
-              disabled={currentQuestionIndex === 0 && !isVideoQuestion}
-              className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              Previous
-            </button>
+              return null;
+            })()}
 
-            {isVideoQuestion ? (
-              <div className="flex items-center gap-4">
-                {/* Video Answer Status Indicator */}
-                <div className="flex-shrink-0">
-                  {recordedVideo ? (
-                    <div className="flex items-center gap-2 bg-green-100 border-2 border-green-500 rounded-full px-4 py-2">
-                      <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-green-800 font-bold text-sm">Video Recorded</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 bg-yellow-100 border-2 border-yellow-500 rounded-full px-4 py-2">
-                      <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-yellow-800 font-bold text-sm">No Video</span>
-                    </div>
-                  )}
+            {/* Review Mode - Mensaje de confirmación (el video ya se muestra arriba) */}
+            {isReviewMode && !isTranscribing && (
+              <div className="glass-card bg-green-100 border-2 border-green-500 rounded-2xl p-4 mb-6">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <p className="font-semibold text-green-800">Recording Complete! Review and edit your transcribed answer below.</p>
                 </div>
-                <button
-                  type="submit"
-                  disabled={submitting || !recordedVideo}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
-                >
-                  {submitting ? 'Submitting...' : 'Submit Interview'}
-                </button>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleNextQuestion}
-                disabled={!answers[currentQuestionIndex] || answers[currentQuestionIndex].trim() === ''}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
-              >
-                {isLastTextQuestion ? 'Continue to Video Introduction' : 'Next Question'}
-              </button>
             )}
-          </div>
-        </form>
+
+            {/* Editable Transcription - Panel lateral/colapsable solo en Review Mode */}
+            {isReviewMode && !isTranscribing && (
+              <div className="glass-card bg-white/60 backdrop-blur-md border border-white/40 rounded-2xl p-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Review and edit your transcribed answer:
+                </label>
+                <textarea
+                  value={answers[currentQuestionIndex] || transcribedText}
+                  onChange={(e) => handleAnswerChange(e.target.value)}
+                  onPaste={handlePaste}
+                  className="glass-card bg-white/80 backdrop-blur-sm border border-white/40 rounded-xl w-full py-4 px-6 text-gray-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  style={{ 
+                    userSelect: 'text',
+                    WebkitUserSelect: 'text',
+                    MozUserSelect: 'text',
+                    msUserSelect: 'text'
+                  }}
+                  rows="6"
+                  required
+                  placeholder="Your transcribed answer will appear here. You can edit any typos or mistakes..."
+                />
+              </div>
+            )}
+
+          </form>
+        </div>
       </div>
     </div>
   );
