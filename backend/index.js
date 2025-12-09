@@ -40,10 +40,17 @@ if (process.env.NODE_ENV !== 'production') {
 console.log('🌐 CORS Configuration:');
 console.log('  NODE_ENV:', process.env.NODE_ENV);
 console.log('  CORS_ORIGINS env:', process.env.CORS_ORIGINS);
+console.log('  CORS_ORIGINS type:', typeof process.env.CORS_ORIGINS);
+console.log('  CORS_ORIGINS length:', process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.length : 0);
 console.log('  Allowed Origins:', allowedOrigins);
+console.log('  Allowed Origins count:', allowedOrigins.length);
 
 const corsOptions = {
   origin: function (origin, callback) {
+    // Log para debugging
+    console.log(`\n🔍 [CORS] Request received - Origin: ${origin || '(no origin)'}`);
+    console.log(`🔍 [CORS] Allowed origins: ${JSON.stringify(allowedOrigins)}`);
+    
     // Permitir requests sin origin (mobile apps, Postman, etc.)
     if (!origin) {
       console.log('  ✅ CORS: Allowing request without origin');
@@ -52,10 +59,21 @@ const corsOptions = {
     
     // Normalizar origin: remover barra final si existe
     const normalizedOrigin = origin.replace(/\/$/, '');
+    console.log(`🔍 [CORS] Normalized origin: ${normalizedOrigin}`);
     
     // Verificar coincidencia exacta
-    if (allowedOrigins.indexOf(normalizedOrigin) !== -1) {
-      console.log(`  ✅ CORS: Allowing origin (exact match): ${normalizedOrigin}`);
+    const exactMatchIndex = allowedOrigins.indexOf(normalizedOrigin);
+    if (exactMatchIndex !== -1) {
+      console.log(`  ✅ CORS: Allowing origin (exact match at index ${exactMatchIndex}): ${normalizedOrigin}`);
+      return callback(null, true);
+    }
+    
+    // Verificar coincidencia case-insensitive (por si acaso)
+    const caseInsensitiveMatch = allowedOrigins.find(allowed => 
+      allowed.toLowerCase() === normalizedOrigin.toLowerCase()
+    );
+    if (caseInsensitiveMatch) {
+      console.log(`  ✅ CORS: Allowing origin (case-insensitive match): ${normalizedOrigin}`);
       return callback(null, true);
     }
     
@@ -73,6 +91,11 @@ const corsOptions = {
     
     console.log(`  ❌ CORS: Blocked origin: ${normalizedOrigin}`);
     console.log(`  Allowed origins: ${allowedOrigins.join(', ')}`);
+    console.log(`  Comparison details:`);
+    allowedOrigins.forEach((allowed, idx) => {
+      console.log(`    [${idx}] "${allowed}" === "${normalizedOrigin}" ? ${allowed === normalizedOrigin}`);
+      console.log(`    [${idx}] "${allowed.toLowerCase()}" === "${normalizedOrigin.toLowerCase()}" ? ${allowed.toLowerCase() === normalizedOrigin.toLowerCase()}`);
+    });
     callback(new Error('Not allowed by CORS'));
   },
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
@@ -90,6 +113,31 @@ const corsOptions = {
   optionsSuccessStatus: 200, // Para navegadores legacy
   preflightContinue: false,
 };
+
+// Middleware de CORS manual como respaldo (se ejecuta antes del middleware de cors)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Si el origin está en la lista de permitidos, agregar headers CORS
+  if (origin) {
+    const normalizedOrigin = origin.replace(/\/$/, '');
+    if (allowedOrigins.includes(normalizedOrigin) || 
+        allowedOrigins.some(allowed => allowed.toLowerCase() === normalizedOrigin.toLowerCase())) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Allow-Methods', 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
+      res.header('Access-Control-Max-Age', '86400');
+    }
+  }
+  
+  // Si es un preflight request (OPTIONS), responder inmediatamente
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+});
 
 // Aplicar CORS a todas las rutas ANTES de cualquier otra ruta
 app.use(cors(corsOptions));
