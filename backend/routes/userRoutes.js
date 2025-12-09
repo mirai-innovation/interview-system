@@ -768,7 +768,7 @@ async function processSubmitInterview(req, res, videoFile, s3VideoUrl) {
     console.error("❌ [SUBMIT INTERVIEW] Error stack:", error.stack);
     return res.status(500).json({ message: "Internal server error" });
   }
-});
+}
 
 // Guardar progreso de entrevista automáticamente
 router.post("/save-interview-progress", authMiddleware, async (req, res) => {
