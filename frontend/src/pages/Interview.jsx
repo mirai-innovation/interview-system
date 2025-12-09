@@ -664,13 +664,23 @@ const Interview = () => {
       return;
     }
 
-    // Validate blob before sending
-    if (videoBlob.size < 1024) {
-      console.error('❌ [TRANSCRIBE] Blob too small:', videoBlob.size);
-      setError('Recorded video is too small. Please record again.');
-      setIsTranscribing(false);
-      return;
-    }
+      // Validate blob before sending
+      if (videoBlob.size < 1024) {
+        console.error('❌ [TRANSCRIBE] Blob too small:', videoBlob.size);
+        setError('Recorded video is too small. Please record again.');
+        setIsTranscribing(false);
+        return;
+      }
+
+      // Check file size limit (50MB = 50 * 1024 * 1024 bytes)
+      const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+      if (videoBlob.size > MAX_FILE_SIZE) {
+        const sizeInMB = (videoBlob.size / (1024 * 1024)).toFixed(2);
+        console.error('❌ [TRANSCRIBE] Blob too large:', videoBlob.size, 'bytes (', sizeInMB, 'MB)');
+        setError(`Video file is too large (${sizeInMB}MB). Maximum size is 50MB. Please record a shorter video.`);
+        setIsTranscribing(false);
+        return;
+      }
 
     // Store current question index to prevent transcription for wrong question
     const questionIndexAtStart = currentQuestionIndex;
@@ -715,35 +725,55 @@ const Interview = () => {
         questionIndex: questionIndexAtStart
       });
       
-      const formData = new FormData();
+      // Step 1: Get presigned URL from backend for direct S3 upload
+      setMessage('Getting upload URL...');
+      console.log('📤 [S3 UPLOAD] Requesting presigned URL...');
+      
+      const uploadUrlResponse = await api.post('/users/get-upload-url', {
+        fileName: `recording_${Date.now()}.${fileExtension}`,
+        contentType: mimeType
+      });
+      
+      const { uploadUrl, publicUrl } = uploadUrlResponse.data;
+      console.log('✅ [S3 UPLOAD] Presigned URL received:', uploadUrl.substring(0, 50) + '...');
+      console.log('✅ [S3 UPLOAD] Public URL will be:', publicUrl);
+      
+      // Step 2: Upload video directly to S3
+      setMessage('Uploading video to S3...');
+      console.log('📤 [S3 UPLOAD] Uploading video to S3...');
+      
       const videoFile = new File([videoBlob], `recording_${Date.now()}.${fileExtension}`, {
         type: mimeType
       });
       
-      // Verify the File object has correct type
-      console.log(`📤 [TRANSCRIBE] File object created:`, {
-        name: videoFile.name,
-        type: videoFile.type,
-        size: videoFile.size
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: videoBlob,
+        headers: {
+          'Content-Type': mimeType,
+        },
       });
       
-      formData.append('video', videoFile);
-
-      // Add timeout of 90 seconds for transcription (increased for larger files)
-      const timeoutMs = 90000;
+      if (!uploadResponse.ok) {
+        throw new Error(`S3 upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
+      }
+      
+      console.log('✅ [S3 UPLOAD] Video uploaded successfully to S3');
+      console.log('✅ [S3 UPLOAD] Public URL:', publicUrl);
+      
+      // Step 3: Send S3 URL to backend for transcription
+      setMessage('Transcribing audio...');
+      console.log('📤 [TRANSCRIBE] Sending S3 URL for transcription...');
+      
+      const timeoutMs = 180000; // 3 minutes for transcription (longer since file is already uploaded)
       const response = await Promise.race([
-        api.post('/users/transcribe-video', formData, {
+        api.post('/users/transcribe-video', {
+          s3Url: publicUrl
+        }, {
           headers: {
-            'Content-Type': 'multipart/form-data',
+            'Content-Type': 'application/json',
           },
           timeout: timeoutMs,
-          // Add upload progress tracking
-          onUploadProgress: (progressEvent) => {
-            if (progressEvent.total) {
-              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-              console.log(`📤 [TRANSCRIBE] Upload progress: ${percentCompleted}%`);
-            }
-          }
         }),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Request timeout')), timeoutMs)
@@ -818,10 +848,15 @@ const Interview = () => {
         // If retries exhausted or client error, show specific error message
         let errorMessage = 'Error transcribing audio. You can still type your answer manually.';
         
-        if (isNetworkError) {
+        // Check for specific error codes
+        if (err.response?.status === 413 || err.code === 'ERR_FAILED' && err.message?.includes('413')) {
+          const sizeInMB = videoBlob ? (videoBlob.size / (1024 * 1024)).toFixed(2) : 'unknown';
+          errorMessage = `Video file is too large (${sizeInMB}MB). Maximum size is 50MB. Please record a shorter video or the system will compress it automatically.`;
+          console.error('❌ [TRANSCRIBE] File too large error (413)');
+        } else if (isNetworkError) {
           errorMessage = 'Network error during transcription. Please check your connection and try recording again.';
         } else if (isClientError) {
-          const serverMessage = err.response?.data?.message || '';
+          const serverMessage = err.response?.data?.message || err.response?.data?.error || '';
           if (serverMessage.includes('format') || serverMessage.includes('codec')) {
             errorMessage = 'Video format not supported. Please try recording again with a different browser.';
           } else {

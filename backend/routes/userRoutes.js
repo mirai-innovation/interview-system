@@ -16,6 +16,8 @@ import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 dotenv.config();
 
@@ -24,6 +26,57 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
+
+// Helper function to transcribe and respond
+async function transcribeAndRespond(filePathToTranscribe, tempFilePath, req, res) {
+  try {
+    console.log('🎥 [TRANSCRIBE] Starting transcription...');
+    console.log('🎥 [TRANSCRIBE] File path:', filePathToTranscribe);
+    
+    let transcription;
+    try {
+      transcription = await transcribeVideoAudio(filePathToTranscribe);
+      console.log('✅ [TRANSCRIBE] Transcription completed:', transcription ? `${transcription.length} characters` : 'empty');
+    } catch (transcriptionError) {
+      console.error('❌ [TRANSCRIBE] Transcription error:', transcriptionError.message);
+      throw transcriptionError;
+    }
+    
+    if (!transcription || transcription.trim().length === 0) {
+      console.warn('⚠️ [TRANSCRIBE] Empty transcription result');
+      transcription = '';
+    }
+
+    // Delete temporary file after transcription
+    if (tempFilePath && fs.existsSync(tempFilePath)) {
+      try {
+        fs.unlinkSync(tempFilePath);
+        console.log('🗑️  [TRANSCRIBE] Temp file deleted');
+      } catch (err) {
+        console.error("❌ [TRANSCRIBE] Error deleting temp file:", err);
+      }
+    } else if (req.file && req.file.path && VIDEO_STORAGE_TYPE === 'local') {
+      try {
+        fs.unlinkSync(req.file.path);
+        console.log('🗑️  [TRANSCRIBE] Local file deleted');
+      } catch (err) {
+        console.error("❌ [TRANSCRIBE] Error deleting local file:", err);
+      }
+    }
+
+    return res.json({ transcription });
+  } catch (error) {
+    // Clean up temp file on error
+    if (tempFilePath && fs.existsSync(tempFilePath)) {
+      try {
+        fs.unlinkSync(tempFilePath);
+      } catch (err) {
+        console.error("❌ [TRANSCRIBE] Error deleting temp file:", err);
+      }
+    }
+    throw error;
+  }
+}
 
 // Servir archivos estáticos de CVs (solo para almacenamiento local)
 if (STORAGE_TYPE === 'local') {
@@ -185,64 +238,39 @@ router.post("/analyze-cv", authMiddleware, async (req, res) => {
 });
 
 // Transcribe video audio using Whisper
-router.post("/transcribe-video", authMiddleware, videoUpload.single('video'), async (req, res) => {
+// Now supports both direct file upload and S3 URL
+router.post("/transcribe-video", authMiddleware, async (req, res) => {
   let tempFilePath = null;
+  let filePathToTranscribe = null;
+  let s3Url = null;
   
   try {
     console.log('🎥 [TRANSCRIBE] Video transcription request received');
     console.log('🎥 [TRANSCRIBE] Storage type:', VIDEO_STORAGE_TYPE);
-    console.log('🎥 [TRANSCRIBE] File received:', req.file ? 'Yes' : 'No');
+    console.log('🎥 [TRANSCRIBE] Request body keys:', Object.keys(req.body));
+    console.log('🎥 [TRANSCRIBE] Request has file:', !!req.file);
+    console.log('🎥 [TRANSCRIBE] Request has s3Url:', !!req.body.s3Url);
     
-    if (!req.file) {
-      console.error('❌ [TRANSCRIBE] No video file provided');
-      return res.status(400).json({ message: "No video file provided" });
-    }
-    
-    // Validate file size (should be at least 1KB and max 50MB)
-    if (req.file.size < 1024) {
-      console.error('❌ [TRANSCRIBE] File too small:', req.file.size);
-      return res.status(400).json({ message: "Video file is too small. Please ensure the recording contains audio." });
-    }
-    
-    if (req.file.size > 50 * 1024 * 1024) {
-      console.error('❌ [TRANSCRIBE] File too large:', req.file.size);
-      return res.status(400).json({ message: "Video file is too large. Maximum size is 50MB." });
-    }
-    
-    // Log file MIME type for debugging
-    console.log('🎥 [TRANSCRIBE] File MIME type:', req.file.mimetype || 'unknown');
-    console.log('🎥 [TRANSCRIBE] File size:', req.file.size, 'bytes');
-
-    // Log file details
-    if (VIDEO_STORAGE_TYPE === 's3') {
-      console.log('🎥 [TRANSCRIBE] S3 File details:');
-      console.log('   - Location:', req.file.location);
-      console.log('   - Key:', req.file.key);
-      console.log('   - Bucket:', req.file.bucket);
-      console.log('   - Size:', req.file.size);
-    } else {
-      console.log('🎥 [TRANSCRIBE] Local file details:');
-      console.log('   - Path:', req.file.path);
-      console.log('   - Size:', req.file.size);
-    }
-
-    let filePathToTranscribe;
-    
-    // Si es S3, descargar el archivo temporalmente desde la URL pública
-    if (VIDEO_STORAGE_TYPE === 's3' && req.file.location) {
-      console.log('🎥 [TRANSCRIBE] Downloading from S3 to temp location...');
-      // En entornos serverless (Vercel), usar /tmp que es el único directorio escribible
-      // En desarrollo local, usar la carpeta uploads/videos
+    // Check if we have an S3 URL (direct upload) or a file upload
+    if (req.body.s3Url) {
+      // Direct S3 upload - use the URL directly
+      s3Url = req.body.s3Url;
+      console.log('🎥 [TRANSCRIBE] Using S3 URL for transcription:', s3Url);
+      
+      if (!s3Url.startsWith('http://') && !s3Url.startsWith('https://')) {
+        return res.status(400).json({ message: "Invalid S3 URL provided" });
+      }
+      
+      // Download from S3 URL
       const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
       const tempDir = isServerless ? '/tmp' : path.join(__dirname, '../uploads/videos');
       
-      // Crear el directorio si no existe (solo en local, /tmp siempre existe en serverless)
       if (!isServerless && !fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true });
       }
       
-      tempFilePath = path.join(tempDir, `temp_${Date.now()}_${path.basename(req.file.key || 'video.webm')}`);
-      console.log('🎥 [TRANSCRIBE] Temp file path:', tempFilePath);
+      tempFilePath = path.join(tempDir, `temp_${Date.now()}_transcribe.webm`);
+      console.log('🎥 [TRANSCRIBE] Downloading from S3 URL to temp location:', tempFilePath);
       
       // Download from S3 with timeout and retry logic
       let downloadSuccess = false;
@@ -256,9 +284,9 @@ router.post("/transcribe-video", authMiddleware, videoUpload.single('video'), as
           
           const response = await axios({
             method: 'GET',
-            url: req.file.location,
+            url: s3Url,
             responseType: 'stream',
-            timeout: 30000, // 30 seconds timeout for download
+            timeout: 60000, // 60 seconds timeout for download
           });
           
           const writeStream = fs.createWriteStream(tempFilePath);
@@ -267,7 +295,7 @@ router.post("/transcribe-video", authMiddleware, videoUpload.single('video'), as
             const timeout = setTimeout(() => {
               writeStream.destroy();
               reject(new Error('Download timeout'));
-            }, 30000);
+            }, 60000);
             
             response.data.pipe(writeStream);
             response.data.on('error', (err) => {
@@ -285,61 +313,159 @@ router.post("/transcribe-video", authMiddleware, videoUpload.single('video'), as
           });
           
           downloadSuccess = true;
-          console.log('✅ [TRANSCRIBE] File downloaded successfully');
+          console.log('✅ [TRANSCRIBE] File downloaded successfully from S3');
+          filePathToTranscribe = tempFilePath;
         } catch (downloadError) {
           console.error(`❌ [TRANSCRIBE] Download attempt ${downloadAttempts} failed:`, downloadError.message);
           if (downloadAttempts >= maxDownloadAttempts) {
             throw new Error(`Failed to download video from S3 after ${maxDownloadAttempts} attempts: ${downloadError.message}`);
           }
-          // Wait before retry
           await new Promise(resolve => setTimeout(resolve, 1000 * downloadAttempts));
         }
       }
-      
-      filePathToTranscribe = tempFilePath;
     } else {
-      // Para almacenamiento local, usar el path directamente
-      console.log('🎥 [TRANSCRIBE] Using local file path');
-      filePathToTranscribe = req.file.path;
+      // Traditional file upload - use multer middleware
+      // We need to handle this with multer, but conditionally
+      return new Promise((resolve, reject) => {
+        videoUpload.single('video')(req, res, async (err) => {
+          if (err) {
+            console.error('❌ [TRANSCRIBE] Multer error:', err);
+            return res.status(400).json({ message: err.message || "Error uploading file" });
+          }
+          
+          if (!req.file) {
+            console.error('❌ [TRANSCRIBE] No video file provided');
+            return res.status(400).json({ message: "No video file provided. Either upload a file or provide an s3Url." });
+          }
+          
+          try {
+            // Continue with existing file upload logic
+            await processFileUpload(req, res, resolve, reject);
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
     }
-
-    // Transcribe using Whisper
-    console.log('🎥 [TRANSCRIBE] Starting transcription...');
-    console.log('🎥 [TRANSCRIBE] File path:', filePathToTranscribe);
     
-    let transcription;
-    try {
-      transcription = await transcribeVideoAudio(filePathToTranscribe);
-      console.log('✅ [TRANSCRIBE] Transcription completed:', transcription ? `${transcription.length} characters` : 'empty');
-    } catch (transcriptionError) {
-      console.error('❌ [TRANSCRIBE] Transcription error:', transcriptionError.message);
-      throw transcriptionError;
-    }
-    
-    if (!transcription || transcription.trim().length === 0) {
-      console.warn('⚠️ [TRANSCRIBE] Empty transcription result');
-      // Return empty string instead of error - let user type manually
-      transcription = '';
+    // If we have a file path to transcribe (from S3 URL), continue with transcription
+    if (filePathToTranscribe) {
+      // Validate file exists and has reasonable size
+      const stats = fs.statSync(filePathToTranscribe);
+      if (stats.size < 1024) {
+        console.error('❌ [TRANSCRIBE] File too small:', stats.size);
+        if (tempFilePath && fs.existsSync(tempFilePath)) {
+          fs.unlinkSync(tempFilePath);
+        }
+        return res.status(400).json({ message: "Video file is too small. Please ensure the recording contains audio." });
+      }
+      
+      if (stats.size > 50 * 1024 * 1024) {
+        console.error('❌ [TRANSCRIBE] File too large:', stats.size);
+        if (tempFilePath && fs.existsSync(tempFilePath)) {
+          fs.unlinkSync(tempFilePath);
+        }
+        return res.status(400).json({ message: "Video file is too large. Maximum size is 50MB." });
+      }
+      
+      console.log('🎥 [TRANSCRIBE] File size:', stats.size, 'bytes');
+    } else {
+      // Traditional file upload path - handle with multer
+      return new Promise((resolve, reject) => {
+        videoUpload.single('video')(req, res, async (err) => {
+          if (err) {
+            console.error('❌ [TRANSCRIBE] Multer error:', err);
+            return res.status(400).json({ message: err.message || "Error uploading file" });
+          }
+          
+          if (!req.file) {
+            console.error('❌ [TRANSCRIBE] No video file provided');
+            return res.status(400).json({ message: "No video file provided. Either upload a file or provide an s3Url." });
+          }
+          
+          // Validate file size
+          if (req.file.size < 1024) {
+            console.error('❌ [TRANSCRIBE] File too small:', req.file.size);
+            return res.status(400).json({ message: "Video file is too small. Please ensure the recording contains audio." });
+          }
+          
+          if (req.file.size > 50 * 1024 * 1024) {
+            console.error('❌ [TRANSCRIBE] File too large:', req.file.size);
+            return res.status(400).json({ message: "Video file is too large. Maximum size is 50MB." });
+          }
+          
+          console.log('🎥 [TRANSCRIBE] File MIME type:', req.file.mimetype || 'unknown');
+          console.log('🎥 [TRANSCRIBE] File size:', req.file.size, 'bytes');
+          
+          // Determine file path based on storage type
+          if (VIDEO_STORAGE_TYPE === 's3' && req.file.location) {
+            // Download from S3
+            const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+            const tempDir = isServerless ? '/tmp' : path.join(__dirname, '../uploads/videos');
+            
+            if (!isServerless && !fs.existsSync(tempDir)) {
+              fs.mkdirSync(tempDir, { recursive: true });
+            }
+            
+            tempFilePath = path.join(tempDir, `temp_${Date.now()}_${path.basename(req.file.key || 'video.webm')}`);
+            
+            let downloadSuccess = false;
+            let downloadAttempts = 0;
+            const maxDownloadAttempts = 3;
+            
+            while (!downloadSuccess && downloadAttempts < maxDownloadAttempts) {
+              try {
+                downloadAttempts++;
+                const response = await axios({
+                  method: 'GET',
+                  url: req.file.location,
+                  responseType: 'stream',
+                  timeout: 60000,
+                });
+                
+                const writeStream = fs.createWriteStream(tempFilePath);
+                await new Promise((resolve, reject) => {
+                  const timeout = setTimeout(() => {
+                    writeStream.destroy();
+                    reject(new Error('Download timeout'));
+                  }, 60000);
+                  
+                  response.data.pipe(writeStream);
+                  response.data.on('error', reject);
+                  writeStream.on('finish', () => {
+                    clearTimeout(timeout);
+                    resolve();
+                  });
+                  writeStream.on('error', reject);
+                });
+                
+                downloadSuccess = true;
+                filePathToTranscribe = tempFilePath;
+              } catch (downloadError) {
+                if (downloadAttempts >= maxDownloadAttempts) {
+                  return res.status(500).json({ message: `Failed to download video: ${downloadError.message}` });
+                }
+                await new Promise(resolve => setTimeout(resolve, 1000 * downloadAttempts));
+              }
+            }
+          } else {
+            filePathToTranscribe = req.file.path;
+          }
+          
+          // Continue with transcription
+          try {
+            await transcribeAndRespond(filePathToTranscribe, tempFilePath, req, res);
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
+      return; // Exit early, multer will handle the response
     }
 
-    // Delete temporary file after transcription (only local temp, NOT S3 file)
-    if (tempFilePath && fs.existsSync(tempFilePath)) {
-      try {
-        fs.unlinkSync(tempFilePath);
-        console.log('🗑️  [TRANSCRIBE] Temp file deleted');
-      } catch (err) {
-        console.error("❌ [TRANSCRIBE] Error deleting temp file:", err);
-      }
-    } else if (req.file.path && VIDEO_STORAGE_TYPE === 'local') {
-      try {
-        fs.unlinkSync(req.file.path);
-        console.log('🗑️  [TRANSCRIBE] Local file deleted');
-      } catch (err) {
-        console.error("❌ [TRANSCRIBE] Error deleting local file:", err);
-      }
-    }
-
-    return res.json({ transcription });
+    // Transcribe using the file path we have
+    await transcribeAndRespond(filePathToTranscribe, tempFilePath, req, res);
   } catch (error) {
     console.error("❌ [TRANSCRIBE] Error transcribing video:", error);
     console.error("❌ [TRANSCRIBE] Error stack:", error.stack);
