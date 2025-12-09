@@ -932,9 +932,6 @@ const Interview = () => {
         stopUnifiedRecording();
       }
 
-      // Prepare FormData for multipart/form-data submission
-      const formData = new FormData();
-      
       // Only send text answers (exactly allQuestions.length, not including video question)
       // Ensure the answers array matches the number of text questions
       const textAnswers = answers.slice(0, allQuestions.length);
@@ -946,43 +943,92 @@ const Interview = () => {
         return;
       }
       
-      // Add text answers as JSON string
-      formData.append('answers', JSON.stringify(textAnswers));
+      // Check if video was uploaded directly to S3 (we should have the publicUrl stored)
+      // If videoBlob exists but we're using direct S3 upload, we need to upload it first
+      let s3VideoUrl = null;
       
-      // Add final video question video if available (only for the final video question)
       if (videoBlob && isVideoQuestion) {
-        // Use stored MIME type or fallback
-        let mimeType = videoBlobType || videoBlob.type || 'video/webm';
-        let fileExtension = 'webm';
+        // Upload video directly to S3 first
+        setMessage('Uploading video to S3...');
+        console.log('📤 [SUBMIT] Uploading final video to S3...');
         
-        if (mimeType.includes('mp4')) {
-          fileExtension = 'mp4';
-          mimeType = 'video/mp4';
-        } else if (mimeType.includes('webm')) {
-          fileExtension = 'webm';
-          mimeType = 'video/webm';
-        } else if (mimeType.includes('quicktime') || mimeType.includes('mov')) {
-          fileExtension = 'mov';
-          mimeType = 'video/quicktime';
+        try {
+          // Get presigned URL
+          const uploadUrlResponse = await api.post('/users/get-upload-url', {
+            fileName: `interview_video_${Date.now()}.webm`,
+            contentType: videoBlobType || videoBlob.type || 'video/webm'
+          });
+          
+          const { uploadUrl, publicUrl } = uploadUrlResponse.data;
+          
+          // Upload to S3
+          const uploadResponse = await fetch(uploadUrl, {
+            method: 'PUT',
+            body: videoBlob,
+            headers: {
+              'Content-Type': videoBlobType || videoBlob.type || 'video/webm',
+            },
+          });
+          
+          if (!uploadResponse.ok) {
+            throw new Error(`S3 upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
+          }
+          
+          s3VideoUrl = publicUrl;
+          console.log('✅ [SUBMIT] Video uploaded to S3:', s3VideoUrl);
+        } catch (uploadError) {
+          console.error('❌ [SUBMIT] Error uploading video to S3:', uploadError);
+          setError('Failed to upload video. Please try again.');
+          setSubmitting(false);
+          return;
+        }
+      }
+      
+      // Prepare request body (JSON if using S3 URL, FormData if traditional upload)
+      let requestBody;
+      let headers = {};
+      
+      if (s3VideoUrl) {
+        // Use JSON if video is in S3
+        requestBody = {
+          answers: textAnswers,
+          s3VideoUrl: s3VideoUrl
+        };
+        headers['Content-Type'] = 'application/json';
+      } else {
+        // Use FormData for traditional file upload (fallback)
+        const formData = new FormData();
+        formData.append('answers', JSON.stringify(textAnswers));
+        
+        if (videoBlob && isVideoQuestion) {
+          let mimeType = videoBlobType || videoBlob.type || 'video/webm';
+          let fileExtension = 'webm';
+          
+          if (mimeType.includes('mp4')) {
+            fileExtension = 'mp4';
+            mimeType = 'video/mp4';
+          } else if (mimeType.includes('webm')) {
+            fileExtension = 'webm';
+            mimeType = 'video/webm';
+          } else if (mimeType.includes('quicktime') || mimeType.includes('mov')) {
+            fileExtension = 'mov';
+            mimeType = 'video/quicktime';
+          }
+          
+          const videoFile = new File([videoBlob], `interview_video_${Date.now()}.${fileExtension}`, {
+            type: mimeType
+          });
+          
+          formData.append('video', videoFile);
         }
         
-        const videoFile = new File([videoBlob], `interview_video_${Date.now()}.${fileExtension}`, {
-          type: mimeType
-        });
-        
-        console.log(`📤 [SUBMIT] Final video file:`, {
-          name: videoFile.name,
-          type: videoFile.type,
-          size: videoFile.size
-        });
-        
-        formData.append('video', videoFile);
+        requestBody = formData;
+        // Don't set Content-Type for FormData, let browser set it with boundary
       }
 
-      const response = await api.post('/users/submit-interview', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      setMessage('Submitting interview...');
+      const response = await api.post('/users/submit-interview', requestBody, {
+        headers: headers,
       });
       
       setMessage('Interview submitted successfully');

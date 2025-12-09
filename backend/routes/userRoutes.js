@@ -598,23 +598,74 @@ router.post("/transcribe-video", authMiddleware, async (req, res) => {
 });
 
 // Envío de respuestas de entrevista
-router.post("/submit-interview", authMiddleware, videoUpload.any(), async (req, res) => {
+// Acepta tanto archivos subidos tradicionalmente como URLs de S3
+router.post("/submit-interview", authMiddleware, async (req, res) => {
+  let videoFile = null;
+  let s3VideoUrl = null;
+  
   try {
     console.log('📝 [SUBMIT INTERVIEW] Interview submission received');
     console.log('📝 [SUBMIT INTERVIEW] Storage type:', VIDEO_STORAGE_TYPE);
-    console.log('📝 [SUBMIT INTERVIEW] Files received:', req.files ? req.files.length : 0);
+    console.log('📝 [SUBMIT INTERVIEW] Request body keys:', Object.keys(req.body));
+    console.log('📝 [SUBMIT INTERVIEW] Request has files:', !!req.files);
+    console.log('📝 [SUBMIT INTERVIEW] Request has s3VideoUrl:', !!req.body.s3VideoUrl);
     
     const user = await User.findById(req.userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
+    const { answers, s3VideoUrl: bodyS3VideoUrl } = req.body;
+    
+    // Check if we have an S3 URL (direct upload) or need to process file upload
+    if (bodyS3VideoUrl) {
+      // Video was uploaded directly to S3
+      s3VideoUrl = bodyS3VideoUrl;
+      console.log('📝 [SUBMIT INTERVIEW] Using S3 URL for video:', s3VideoUrl);
+    } else {
+      // Traditional file upload - use multer middleware
+      return new Promise((resolve, reject) => {
+        videoUpload.any()(req, res, async (err) => {
+          if (err) {
+            console.error('❌ [SUBMIT INTERVIEW] Multer error:', err);
+            return res.status(400).json({ message: err.message || "Error uploading file" });
+          }
+          
+          // Find the main video file (for final video question)
+          videoFile = req.files?.find(f => f.fieldname === 'video') || null;
+          
+          try {
+            await processSubmitInterview(req, res, videoFile, null);
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
+    }
+    
+    // Process with S3 URL
+    await processSubmitInterview(req, res, null, s3VideoUrl);
+  } catch (error) {
+    console.error("❌ [SUBMIT INTERVIEW] Error processing interview:", error);
+    console.error("❌ [SUBMIT INTERVIEW] Error stack:", error.stack);
+    return res.status(500).json({ message: error.message || "Internal server error" });
+  }
+});
+
+// Helper function to process interview submission
+async function processSubmitInterview(req, res, videoFile, s3VideoUrl) {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
     const { answers } = req.body;
-    // Find the main video file (for final video question)
-    // When using .any(), files are in req.files array
-    const videoFile = req.files?.find(f => f.fieldname === 'video') || null;
     
     console.log('📝 [SUBMIT INTERVIEW] Video file found:', videoFile ? 'Yes' : 'No');
+    console.log('📝 [SUBMIT INTERVIEW] S3 video URL found:', s3VideoUrl ? 'Yes' : 'No');
+    
     if (videoFile) {
       if (VIDEO_STORAGE_TYPE === 's3') {
         console.log('📝 [SUBMIT INTERVIEW] S3 Video details:');
@@ -678,8 +729,14 @@ router.post("/submit-interview", authMiddleware, videoUpload.any(), async (req, 
     const { total_score, evaluations } = await calculateScoreBasedOnAnswers(allQuestions, textAnswers);
 
     user.interviewResponses = textAnswers;
-    if (videoFile) {
-      // Determinar la ruta del video según el tipo de almacenamiento
+    
+    // Handle video - either from file upload or S3 URL
+    if (s3VideoUrl) {
+      // Video was uploaded directly to S3
+      user.interviewVideo = s3VideoUrl;
+      console.log('✅ [SUBMIT INTERVIEW] Video URL from S3:', s3VideoUrl);
+    } else if (videoFile) {
+      // Video was uploaded traditionally
       let videoPath;
       if (VIDEO_STORAGE_TYPE === 's3') {
         // Para S3, usar la URL del archivo
