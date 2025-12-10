@@ -1026,76 +1026,110 @@ const Interview = () => {
   // Show start screen if interview hasn't started
   if (!interviewStarted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="min-h-screen bg-mesh-gradient relative">
+        {/* Ambient Orbs */}
+        <div className="ambient-orb-1"></div>
+        <div className="ambient-orb-2"></div>
+        <div className="ambient-orb-3"></div>
+        
         <Navbar />
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-3xl mx-auto">
-            <div className="bg-white rounded-xl shadow-lg p-8 text-center">
-              <div className="mb-6">
-                <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </div>
-                <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                  {answers.length > 0 && answers.some(a => a && a.trim() !== '') 
-                    ? 'Continue Interview' 
-                    : 'Interview Ready'}
-                </h1>
-                {answers.length > 0 && answers.some(a => a && a.trim() !== '') ? (
-                  <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 mb-4">
-                    <p className="text-green-800 font-semibold mb-2">✓ Progress Saved</p>
-                    <p className="text-green-700 text-sm">
-                      You have saved answers. You can continue from where you left off.
-                    </p>
+        <div className="container mx-auto px-4 py-8 sm:py-12 max-w-4xl relative z-10">
+          <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-3xl shadow-2xl p-6 sm:p-8 md:p-12">
+            {/* Icon and Title */}
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <svg className="w-10 h-10 sm:w-12 sm:h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+                {answers.length > 0 && answers.some(a => a && a.trim() !== '') 
+                  ? 'Continue Interview' 
+                  : 'Interview Ready'}
+              </h1>
+              
+              {/* Progress Saved Banner */}
+              {answers.length > 0 && answers.some(a => a && a.trim() !== '') ? (
+                <div className="glass-card bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-2xl p-4 sm:p-5 mb-6 shadow-lg">
+                  <div className="flex items-center justify-center gap-3 mb-2">
+                    <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <p className="text-green-800 font-bold text-lg">Progress Saved</p>
                   </div>
-                ) : null}
-                <p className="text-lg text-gray-600 mb-2">
-                  You have <span className="font-semibold text-blue-600">{allQuestions.length + 1}</span> questions to answer
+                  <p className="text-green-700 text-sm sm:text-base">
+                    You have saved answers. You can continue from where you left off.
+                  </p>
+                </div>
+              ) : null}
+              
+              {/* Question Count */}
+              <div className="mb-6">
+                <p className="text-lg sm:text-xl text-gray-600 mb-2">
+                  You have <span className="font-bold text-blue-600 text-2xl">{allQuestions.length + 1}</span> questions to answer
                 </p>
-                <p className="text-gray-500 mb-6">
+                <p className="text-gray-500 text-sm sm:text-base">
                   Each question has a time limit of 3 minutes. The timer will start automatically when you begin.
-                  {answers.length > 0 && answers.some(a => a && a.trim() !== '') && (
-                    <span className="block mt-2 text-green-600 font-semibold">
-                      Your progress is automatically saved as you answer.
-                    </span>
-                  )}
                 </p>
+                {answers.length > 0 && answers.some(a => a && a.trim() !== '') && (
+                  <p className="mt-3 text-green-600 font-semibold text-sm sm:text-base">
+                    Your progress is automatically saved as you answer.
+                  </p>
+                )}
               </div>
+            </div>
 
-              <div className="bg-blue-50 rounded-lg p-6 mb-6">
-                <h3 className="font-semibold text-gray-900 mb-3">Instructions:</h3>
-                <ul className="text-left text-gray-700 space-y-2">
-                  <li className="flex items-start gap-2">
-                    <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            {/* Instructions Card */}
+            <div className="glass-card bg-gradient-to-br from-blue-50/80 to-purple-50/80 border border-blue-200/50 rounded-2xl p-6 sm:p-8 mb-8">
+              <h3 className="font-bold text-gray-900 mb-4 sm:mb-6 text-lg sm:text-xl flex items-center gap-2">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Instructions:
+              </h3>
+              <ul className="space-y-3 sm:space-y-4">
+                <li className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center mt-0.5">
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span>Answer each question within the 3-minute time limit</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </div>
+                  <span className="text-gray-700 text-sm sm:text-base">Answer each question within the 3-minute time limit</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center mt-0.5">
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span>Copying and pasting text is not allowed</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </div>
+                  <span className="text-gray-700 text-sm sm:text-base">Copying and pasting text is not allowed</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center mt-0.5">
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span>You can navigate between questions using Previous/Next buttons</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </div>
+                  <span className="text-gray-700 text-sm sm:text-base">You can navigate between questions using Previous/Next buttons</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center mt-0.5">
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    <span>The final question requires a 1-minute video introduction</span>
-                  </li>
-                </ul>
-              </div>
+                  </div>
+                  <span className="text-gray-700 text-sm sm:text-base">The final question requires a 1-minute video introduction</span>
+                </li>
+              </ul>
+            </div>
 
+            {/* Start Button */}
+            <div className="text-center">
               <button
                 onClick={startInterview}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 px-12 rounded-lg text-lg transition shadow-lg hover:shadow-xl"
+                className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-700 text-white font-bold py-4 px-8 sm:px-12 rounded-xl text-lg sm:text-xl transition-all duration-300 shadow-2xl hover:shadow-3xl transform hover:scale-105 w-full sm:w-auto"
               >
                 Start Interview
               </button>
