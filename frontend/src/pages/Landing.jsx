@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom';
 import { useContext } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
+import logo from '../assets/logo.png';
+import cvIcon from '../assets/cv.png';
+import interviewIcon from '../assets/interview.png';
 
 const Landing = () => {
   const { user } = useContext(AuthContext);
@@ -8,18 +11,25 @@ const Landing = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Navigation */}
-      <nav className="bg-white shadow-sm sticky top-0 z-50">
+      <nav className="bg-white/95 backdrop-blur-sm shadow-sm sticky top-0 z-50 border-b border-gray-100">
         <div className="container mx-auto px-4 py-3 sm:py-4">
           <div className="flex justify-between items-center">
-            <div>
-              <div className="text-base sm:text-xl font-bold text-blue-600">
-                <span className="hidden sm:inline">Mirai Innovation Research Institute</span>
-                <span className="sm:hidden">MIRI</span>
+            <Link to="/" className="flex items-center gap-3 group">
+              <img 
+                src={logo} 
+                alt="Mirai Innovation" 
+                className="h-8 sm:h-10 w-auto object-contain group-hover:scale-110 transition-transform"
+              />
+              <div>
+                <div className="text-base sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  <span className="hidden sm:inline">Mirai Innovation Research Institute</span>
+                  <span className="sm:hidden">MIRI</span>
+                </div>
+                <div className="text-xs sm:text-sm text-gray-600 hidden sm:block">
+                  Evaluation and Selection System
+                </div>
               </div>
-              <div className="text-xs sm:text-sm text-gray-600 hidden sm:block">
-                Evaluation and Selection System
-              </div>
-            </div>
+            </Link>
             <div className="flex gap-2 sm:gap-4 items-center">
               {user ? (
                 <>
@@ -65,35 +75,34 @@ const Landing = () => {
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-12 sm:py-20 text-center">
         <div className="max-w-4xl mx-auto">
-          <div className="mb-4 sm:mb-6">
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-blue-600 mb-2">
-              Mirai Innovation Research Institute
-            </h2>
-            <p className="text-base sm:text-lg text-gray-600">
-              Selection Process for Academic Programs
-            </p>
+          <div className="mb-6 sm:mb-8 flex justify-center">
+            <img 
+              src={logo} 
+              alt="Mirai Innovation" 
+              className="h-16 sm:h-24 w-auto object-contain drop-shadow-lg"
+            />
           </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4 sm:mb-6">
             Applicant Evaluation and
-            <span className="text-blue-600"> Selection System</span>
+            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"> Selection System</span>
           </h1>
-          <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 px-2">
+          <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 px-2 max-w-3xl mx-auto">
             Complementary platform for the selection process of our academic programs.
-            Evaluate your competencies through automated CV analysis, personalized interviews,
-            and specialized assessments to become part of our excellence programs.
+            Evaluate your competencies through automated CV analysis and personalized interviews
+            to become part of our excellence programs.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center flex-wrap px-4">
             {!user && (
               <>
                 <Link
                   to="/register"
-                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg text-base sm:text-lg font-semibold transition shadow-lg hover:shadow-xl"
+                  className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-xl text-base sm:text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:scale-105"
                 >
                   Start Selection Process
                 </Link>
                 <Link
                   to="/login"
-                  className="w-full sm:w-auto bg-white hover:bg-gray-50 text-blue-600 px-6 sm:px-8 py-3 sm:py-4 rounded-lg text-base sm:text-lg font-semibold transition shadow-lg hover:shadow-xl border-2 border-blue-600"
+                  className="w-full sm:w-auto bg-white hover:bg-gray-50 text-blue-600 px-8 py-4 rounded-xl text-base sm:text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl border-2 border-blue-600 hover:border-blue-700 transform hover:scale-105"
                 >
                   Continue Evaluation
                 </Link>
@@ -102,7 +111,7 @@ const Landing = () => {
             {user && (
               <Link
                 to="/dashboard"
-                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg text-base sm:text-lg font-semibold transition shadow-lg hover:shadow-xl"
+                className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-xl text-base sm:text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:scale-105"
               >
                 Continue My Evaluation
               </Link>
@@ -128,107 +137,86 @@ const Landing = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 max-w-6xl mx-auto">
-          {/* Feature 1 */}
-          <div className="bg-white p-6 sm:p-8 rounded-xl shadow-lg hover:shadow-xl transition">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 sm:mb-6">
-              <svg className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10 max-w-5xl mx-auto">
+          {/* Feature 1 - CV Analysis */}
+          <div className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+            <div className="flex items-center justify-center mb-6">
+              <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center">
+                <img 
+                  src={cvIcon} 
+                  alt="CV Analysis" 
+                  className="w-16 h-16 object-contain"
+                />
+              </div>
             </div>
-            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4 text-center">
               Automated CV Analysis
             </h3>
-            <p className="text-sm sm:text-base text-gray-600">
-              Upload your CV and our system analyzes
+            <p className="text-gray-600 text-center">
+              Upload your CV and our AI-powered system automatically analyzes
               your skills, experience, and competencies to evaluate your profile
               as an applicant to our academic programs.
             </p>
           </div>
 
-          {/* Feature 2 */}
-          <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition">
-            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-6">
-              <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
+          {/* Feature 2 - Interview */}
+          <div className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] border border-gray-100">
+            <div className="flex items-center justify-center mb-6">
+              <div className="w-24 h-24 bg-gradient-to-br from-purple-100 to-purple-200 rounded-2xl flex items-center justify-center">
+                <img 
+                  src={interviewIcon} 
+                  alt="Interview" 
+                  className="w-16 h-16 object-contain"
+                />
+              </div>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4 text-center">
               Personalized Interview
             </h3>
-            <p className="text-gray-600">
+            <p className="text-gray-600 text-center">
               Answer questions specifically generated for you based on your CV.
-              The system evaluates your responses to determine your suitability
+              Our AI evaluates your responses through video interviews to determine your suitability
               and competencies for our programs.
             </p>
           </div>
+        </div>
 
-          {/* Feature 3 */}
-          <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
+        {/* Additional Info Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 max-w-5xl mx-auto mt-8">
+          {/* Evaluation Card */}
+          <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-xl border border-blue-100">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="text-lg font-bold text-gray-900 mb-2">Comprehensive Evaluation</h4>
+                <p className="text-gray-600 text-sm">
+                  Receive a complete evaluation with detailed analysis of your competencies,
+                  which will be used by our selection committee to determine your admission.
+                </p>
+              </div>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">
-              Specialized Assessments
-            </h3>
-            <p className="text-gray-600">
-              Complete soft skills questionnaires (160 questions) and hard skills
-              (Multiple Intelligences) that allow us to comprehensively evaluate
-              your profile as a candidate.
-            </p>
           </div>
 
-          {/* Feature 4 */}
-          <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition">
-            <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-6">
-              <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+          {/* Security Card */}
+          <div className="bg-gradient-to-br from-purple-50 to-blue-50 p-6 rounded-xl border border-purple-100">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="text-lg font-bold text-gray-900 mb-2">Secure & Confidential</h4>
+                <p className="text-gray-600 text-sm">
+                  Your data is protected and only the authorized selection committee has access
+                  to your information for the evaluation process.
+                </p>
+              </div>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">
-              Comprehensive Evaluation
-            </h3>
-            <p className="text-gray-600">
-              Receive a complete evaluation with detailed analysis of your competencies,
-              which will be used by our selection committee to determine
-              your admission to the programs.
-            </p>
-          </div>
-
-          {/* Feature 5 */}
-          <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
-              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">
-              Applicant Profile
-            </h3>
-            <p className="text-gray-600">
-              Generate a complete applicant profile based on all your results,
-              which will be reviewed by our selection team to make
-              the final admission decision.
-            </p>
-          </div>
-
-          {/* Feature 6 */}
-          <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition">
-            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-6">
-              <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">
-              Transparent Process
-            </h3>
-            <p className="text-gray-600">
-              Secure and confidential system. Your data is protected and only
-              the authorized selection committee has access to your information
-              for the evaluation process.
-            </p>
           </div>
         </div>
       </section>
@@ -288,23 +276,6 @@ const Landing = () => {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                    Complete the Assessments
-                  </h3>
-                  <p className="text-gray-600 text-lg">
-                    Complete the soft skills and hard skills questionnaires
-                    that will allow us to comprehensively evaluate your profile
-                    as a candidate for our academic programs.
-                  </p>
-                </div>
-              </div>
-
-              {/* Step 4 */}
-              <div className="flex flex-col md:flex-row items-center gap-8">
-                <div className="flex-shrink-0 w-20 h-20 bg-yellow-600 text-white rounded-full flex items-center justify-center text-3xl font-bold">
-                  4
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3">
                     Committee Review
                   </h3>
                   <p className="text-gray-600 text-lg">
@@ -320,19 +291,20 @@ const Landing = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="bg-gradient-to-r from-blue-600 to-purple-600 py-20">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-4xl font-bold text-white mb-6">
+      <section className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 py-20 relative overflow-hidden">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="container mx-auto px-4 text-center relative z-10">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-6">
             Ready to Apply?
           </h2>
-          <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
             Complete the evaluation process to be considered as an applicant
             to our excellence academic programs.
           </p>
           {!user && (
             <Link
               to="/register"
-              className="inline-block bg-white text-blue-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 transition shadow-lg"
+              className="inline-block bg-white text-blue-600 px-8 py-4 rounded-xl text-lg font-semibold hover:bg-gray-50 transition-all duration-300 shadow-2xl hover:shadow-3xl transform hover:scale-105"
             >
               Start Selection Process
             </Link>
@@ -340,7 +312,7 @@ const Landing = () => {
           {user && (
             <Link
               to="/dashboard"
-              className="inline-block bg-white text-blue-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 transition shadow-lg"
+              className="inline-block bg-white text-blue-600 px-8 py-4 rounded-xl text-lg font-semibold hover:bg-gray-50 transition-all duration-300 shadow-2xl hover:shadow-3xl transform hover:scale-105"
             >
               Go to Dashboard
             </Link>
@@ -353,7 +325,14 @@ const Landing = () => {
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-3 gap-8 mb-8">
             <div>
-              <h3 className="text-2xl font-bold mb-4">Mirai Innovation Research Institute</h3>
+              <div className="flex items-center gap-3 mb-4">
+                <img 
+                  src={logo} 
+                  alt="Mirai Innovation" 
+                  className="h-10 w-auto object-contain"
+                />
+                <h3 className="text-xl font-bold">Mirai Innovation Research Institute</h3>
+              </div>
               <p className="text-gray-400">
                 Evaluation and selection system for academic programs.
                 Complementary platform for the admission process.
