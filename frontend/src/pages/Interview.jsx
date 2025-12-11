@@ -40,6 +40,21 @@ const Interview = () => {
   const [videoAnswers, setVideoAnswers] = useState([]); // Store video answers for each question
   const [shouldAutoStartRecording, setShouldAutoStartRecording] = useState(false); // Flag to auto-start recording
 
+  // ============================================================================
+  // STATE MACHINE: TTS/STT Voice Interaction Control
+  // ============================================================================
+  // Estados posibles:
+  // - IDLE: Estado inicial, sin actividad de voz
+  // - READING_QUESTION: TTS está leyendo la pregunta (esperando onAudioEnd)
+  // - RECORDING: Grabando audio del usuario
+  // - TRANSCRIBING: Procesando transcripción (TTS completamente silenciado)
+  // - REVIEW_MODE: Usuario revisando transcripción
+  // ============================================================================
+  const [voiceState, setVoiceState] = useState('IDLE'); // Estado de la máquina de estados
+  const speechSynthesisRef = useRef(null); // Ref para el utterance actual de TTS
+  const ttsPromiseRef = useRef(null); // Ref para la Promise de TTS (para manejar onAudioEnd)
+  const currentQuestionIndexRef = useRef(null); // Ref para rastrear pregunta actual sin causar re-renders
+
   // Default questions
   const defaultQuestions = [
     "What is your motivation for wanting to come to Mirai Innovation Research Institute?",
@@ -90,6 +105,10 @@ const Interview = () => {
       // Stop video stream
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      // Stop any ongoing speech
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
       }
       // Remove event listeners
       document.removeEventListener('selectstart', preventSelection);
@@ -177,23 +196,44 @@ const Interview = () => {
     setTimerActive(true);
   };
 
-  const startInterview = () => {
+  // ============================================================================
+  // ESTADO INICIAL: Inicio de entrevista
+  // ============================================================================
+  /**
+   * REQUERIMIENTO 1: Estado Inicial
+   * 1. Disparar inmediatamente TTS de Pregunta 1
+   * 2. Esperar estrictamente a onAudioEnd
+   * 3. Transición automática a RECORDING
+   */
+  const startInterview = async () => {
     setInterviewStarted(true);
-    // If we have saved answers, start from where we left off
-    // Otherwise start from the beginning
+    
+    // Determinar índice de pregunta inicial
+    let questionIndex = 0;
     if (answers.length > 0 && answers.some(a => a && a.trim() !== '')) {
-      // Find first unanswered question or continue from current index
       const firstEmptyIndex = answers.findIndex(answer => !answer || answer.trim() === '');
       if (firstEmptyIndex !== -1) {
-        setCurrentQuestionIndex(firstEmptyIndex);
+        questionIndex = firstEmptyIndex;
       }
-    } else {
-      setCurrentQuestionIndex(0);
     }
-    setTimeRemaining(180); // 3 minutes
-    setTimerActive(true); // Start timer automatically
-    // Set flag to auto-start recording when question is set
-    setShouldAutoStartRecording(true);
+    
+    setCurrentQuestionIndex(questionIndex);
+    currentQuestionIndexRef.current = questionIndex;
+    setTimeRemaining(180);
+    setTimerActive(true);
+    
+    // REQUERIMIENTO 1.1: Disparar inmediatamente TTS de Pregunta 1
+    if (allQuestions.length > 0 && questionIndex < allQuestions.length) {
+      const questionText = allQuestions[questionIndex];
+      
+      // REQUERIMIENTO 1.2: Esperar estrictamente a onAudioEnd
+      await readQuestionAloud(questionText);
+      
+      // REQUERIMIENTO 1.3: Transición automática a RECORDING
+      // Solo iniciar grabación después de que onAudioEnd haya ocurrido
+      console.log('[STATE] Transición: READING_QUESTION → RECORDING (después de onAudioEnd)');
+      startUnifiedRecording();
+    }
   };
 
   const handleAnswerChange = (value) => {
@@ -228,75 +268,83 @@ const Interview = () => {
   };
 
   const handleNextQuestion = () => {
-    // Stop any active recordings before moving to next question
+    // REQUERIMIENTO 2.1: Cancelar cualquier TTS activo (Estado de Transición)
+    cancelTTS();
+    
+    // Detener grabación si está activa
     if (isRecording) {
       stopUnifiedRecording();
     }
     
-    // Cancel any ongoing transcription immediately
+    // Limpiar estado de transcripción
     setIsTranscribing(false);
+    setVoiceState('IDLE'); // Reset estado antes de cambiar pregunta
     
-    // Save current progress before moving to next question
+    // Guardar progreso
     saveAnswersAuto(answers);
     
-    // Reset ALL states for next question
+    // Reset estados
     setRecordedVideo(null);
     setVideoBlob(null);
-    setVideoBlobType(null); // Reset MIME type
+    setVideoBlobType(null);
     setTranscribedText('');
     setIsReviewMode(false);
-    setIsTranscribing(false);
-    setAnswerSaved(false); // Reset answer saved flag
+    setAnswerSaved(false);
     setRecordingTime(0);
     setError('');
     setMessage('');
     
-    // Clear video stream if exists
+    // Limpiar recursos
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-    
-    // Clear media recorder
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current = null;
     }
-    
-    // Clear video element
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
     
-    // Clear video answers for current question before moving
+    // Limpiar video answers
     const newVideoAnswers = [...videoAnswers];
     newVideoAnswers[currentQuestionIndex] = null;
     setVideoAnswers(newVideoAnswers);
     
+    // Reset ref para permitir lectura de nueva pregunta
+    currentQuestionIndexRef.current = null;
+    
+    // Avanzar a siguiente pregunta (esto disparará el useEffect de transición)
     if (currentQuestionIndex < allQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
-      setTimeRemaining(180); // Reset timer to 3 minutes for next question
-      setTimerActive(true); // Auto-start timer for next question
+      setTimeRemaining(180);
+      setTimerActive(true);
     } else if (currentQuestionIndex === allQuestions.length - 1) {
-      // Move to video question (final question)
       setCurrentQuestionIndex(allQuestions.length);
-      setTimerActive(false); // No timer for video question
+      setTimerActive(false);
     }
   };
 
   const handlePreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
+      // REQUERIMIENTO 2.1: Cancelar cualquier TTS activo (Estado de Transición)
+      cancelTTS();
+      
       // Stop any active recordings
       if (isRecording) {
         stopUnifiedRecording();
       }
       
+      // Limpiar estado de transcripción
+      setIsTranscribing(false);
+      setVoiceState('IDLE'); // Reset estado antes de cambiar pregunta
+      
       // Reset states when going back
       setRecordedVideo(null);
       setVideoBlob(null);
-      setVideoBlobType(null); // Reset MIME type
+      setVideoBlobType(null);
       setTranscribedText('');
       setIsReviewMode(false);
-      setIsTranscribing(false);
       setRecordingTime(0);
       setError('');
       setMessage('');
@@ -317,6 +365,9 @@ const Interview = () => {
         videoRef.current.srcObject = null;
       }
       
+      // Reset ref para permitir lectura de pregunta anterior
+      currentQuestionIndexRef.current = null;
+      
       setCurrentQuestionIndex(currentQuestionIndex - 1);
       setTimeRemaining(180); // Reset timer to 3 minutes
       setTimerActive(true); // Auto-start timer when going back
@@ -326,7 +377,15 @@ const Interview = () => {
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  // Helper para formatear el tiempo restante de grabación (1 minuto máximo)
+  const formatRecordingTimeRemaining = (elapsedSeconds) => {
+    const remaining = Math.max(0, 60 - elapsedSeconds); // Asegurar que no sea negativo
+    const mins = Math.floor(remaining / 60);
+    const secs = remaining % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
   // Helper function to get supported MIME type for MediaRecorder
@@ -364,6 +423,113 @@ const Interview = () => {
     
     // Last resort: use default (browser will choose)
     return '';
+  };
+
+  // ============================================================================
+  // TTS CONTROL: Text-to-Speech con máquina de estados
+  // ============================================================================
+  /**
+   * Lee una pregunta en voz alta usando Web Speech API
+   * REQUERIMIENTO: Debe esperar estrictamente a onAudioEnd antes de resolver
+   * 
+   * @param {string} questionText - Texto de la pregunta a leer
+   * @returns {Promise<void>} - Resuelve cuando onAudioEnd es disparado
+   */
+  const readQuestionAloud = (questionText) => {
+    return new Promise((resolve, reject) => {
+      // PROHIBICIÓN: No leer durante transcripción
+      if (voiceState === 'TRANSCRIBING') {
+        console.warn('[TTS] Bloqueado: Estado TRANSCRIBING activo');
+        resolve(); // Resolver sin leer para no bloquear flujo
+        return;
+      }
+
+      // LIMPIEZA: Cancelar cualquier TTS activo (Estado de Transición)
+      if (speechSynthesisRef.current || (window.speechSynthesis && window.speechSynthesis.speaking)) {
+        window.speechSynthesis.cancel();
+        // Limpiar refs
+        if (ttsPromiseRef.current) {
+          ttsPromiseRef.current = null;
+        }
+      }
+
+      // Verificar soporte de Speech Synthesis
+      if (!('speechSynthesis' in window)) {
+        console.warn('[TTS] No soportado, continuando sin lectura');
+        resolve();
+        return;
+      }
+
+      // TRANSICIÓN: IDLE/RECORDING → READING_QUESTION
+      setVoiceState('READING_QUESTION');
+
+      const utterance = new SpeechSynthesisUtterance(questionText);
+      
+      // Configuración de voz
+      utterance.rate = 0.9; // Velocidad ligeramente reducida para claridad
+      utterance.pitch = 1;
+      utterance.volume = 1;
+      
+      // Selección de voz preferida
+      const voices = window.speechSynthesis.getVoices();
+      const preferredVoices = voices.filter(voice => 
+        voice.lang.includes('en') && 
+        (voice.name.includes('Natural') || voice.name.includes('Premium') || voice.name.includes('Enhanced'))
+      );
+      
+      if (preferredVoices.length > 0) {
+        utterance.voice = preferredVoices[0];
+      } else if (voices.length > 0) {
+        const englishVoices = voices.filter(voice => voice.lang.startsWith('en'));
+        utterance.voice = englishVoices.length > 0 ? englishVoices[0] : voices[0];
+      }
+
+      // REQUERIMIENTO CRÍTICO: Esperar estrictamente a onAudioEnd
+      utterance.onend = () => {
+        console.log('[TTS] onAudioEnd disparado - Lectura completada');
+        speechSynthesisRef.current = null;
+        ttsPromiseRef.current = null;
+        setVoiceState('IDLE');
+        // Resolver Promise solo cuando onAudioEnd ocurre
+        resolve();
+      };
+
+      // Manejo de errores
+      utterance.onerror = (event) => {
+        console.error('[TTS] Error:', event.error);
+        speechSynthesisRef.current = null;
+        ttsPromiseRef.current = null;
+        setVoiceState('IDLE');
+        // Resolver para no bloquear flujo, pero registrar error
+        resolve();
+      };
+
+      // Guardar referencias
+      speechSynthesisRef.current = utterance;
+      ttsPromiseRef.current = { resolve, reject };
+
+      // Iniciar lectura
+      window.speechSynthesis.speak(utterance);
+      console.log('[TTS] Iniciando lectura de pregunta');
+    });
+  };
+
+  /**
+   * Cancela cualquier TTS activo
+   * REQUERIMIENTO: Debe ejecutarse en Estado de Transición
+   */
+  const cancelTTS = () => {
+    if ('speechSynthesis' in window) {
+      if (window.speechSynthesis.speaking || speechSynthesisRef.current) {
+        console.log('[TTS] Cancelando lectura activa');
+        window.speechSynthesis.cancel();
+      }
+      speechSynthesisRef.current = null;
+      if (ttsPromiseRef.current) {
+        ttsPromiseRef.current = null;
+      }
+      setVoiceState('IDLE');
+    }
   };
 
   // Unified recording function - starts video + audio recording with speech recognition
@@ -468,6 +634,9 @@ const Interview = () => {
       mediaRecorder.start(1000);
       setIsRecording(true);
       setRecordingTime(0);
+      // TRANSICIÓN: IDLE/READING_QUESTION → RECORDING
+      setVoiceState('RECORDING');
+      console.log('[STATE] Transición: → RECORDING');
 
       // Start recording timer (1 minute max)
       recordingTimerRef.current = setInterval(() => {
@@ -516,46 +685,39 @@ const Interview = () => {
     // Transcription will happen when videoBlob is ready (in useEffect)
   };
 
-  // Transcribe video when blob is ready
+  // ============================================================================
+  // ESTADO DE PROCESAMIENTO: Transcripción
+  // ============================================================================
+  /**
+   * REQUERIMIENTO 3: Estado de Procesamiento
+   * Contexto: Cuando videoBlob está listo y grabación terminó
+   * 1. PROHIBICIÓN: Bajo ninguna circunstancia se debe leer pregunta (TTS silenciado)
+   * 2. PROTECCIÓN: No interrumpir proceso de transcripción con nuevos eventos de audio
+   */
   useEffect(() => {
-    // Calculate if this is a video question (must be done inside useEffect to avoid initialization error)
     const isVideoQuestion = currentQuestionIndex !== undefined && allQuestions.length > 0 && currentQuestionIndex >= allQuestions.length;
     
-    // Skip if we don't have a video blob
-    if (!videoBlob) {
+    // Validaciones
+    if (!videoBlob || isRecording || isTranscribing || isReviewMode || answerSaved) {
       return;
     }
     
-    // Skip if we're still recording
-    if (isRecording) {
-      return;
-    }
+    // REQUERIMIENTO 3.1: Transición a TRANSCRIBING (TTS completamente silenciado)
+    setVoiceState('TRANSCRIBING');
+    console.log('[STATE] Transición: RECORDING → TRANSCRIBING (TTS silenciado)');
     
-    // Skip if already transcribing or in review mode
-    if (isTranscribing || isReviewMode) {
-      return;
-    }
+    // REQUERIMIENTO 3.1: Cancelar cualquier TTS que pudiera estar activo
+    cancelTTS();
     
-    // Skip if answer already saved
-    if (answerSaved) {
-      return;
-    }
-    
-    // Skip if question index is invalid
-    if (currentQuestionIndex === undefined) {
-      return;
-    }
-    
-    // For video-only question (final question), directly enter review mode without transcription
+    // Para pregunta de video, ir directamente a review mode
     if (isVideoQuestion) {
       setIsReviewMode(true);
+      setVoiceState('REVIEW_MODE');
       return;
     }
     
-    // For text questions, transcribe the video
-    // Add a small delay to ensure state is stable and blob is complete
+    // Para preguntas de texto, iniciar transcripción
     const timeoutId = setTimeout(() => {
-      // Double-check all conditions before transcribing
       if (videoBlob && 
           !isRecording && 
           !isTranscribing && 
@@ -564,7 +726,6 @@ const Interview = () => {
           currentQuestionIndex !== undefined && 
           !isVideoQuestion) {
         transcribeVideo();
-      } else {
       }
     }, 200);
     
@@ -573,83 +734,109 @@ const Interview = () => {
     };
   }, [videoBlob, isRecording, isReviewMode, isTranscribing, answerSaved, currentQuestionIndex, allQuestions.length]);
 
-  // Reset recording states when question changes
+  // Load voices when component mounts (some browsers need this)
   useEffect(() => {
-    // Skip if interview hasn't started yet
-    if (!interviewStarted) {
+    if ('speechSynthesis' in window) {
+      // Load voices (some browsers need this to populate voices list)
+      const loadVoices = () => {
+        window.speechSynthesis.getVoices();
+      };
+      
+      loadVoices();
+      if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+      }
+    }
+  }, []);
+
+  // ============================================================================
+  // ESTADO DE TRANSICIÓN: Cambio de pregunta
+  // ============================================================================
+  /**
+   * REQUERIMIENTO 2: Estado de Transición
+   * Trigger: Cuando cambia currentQuestionIndex
+   * 1. Ejecutar cancel() en cualquier audio activo
+   * 2. Iniciar lectura de nueva pregunta completa
+   * 3. Esperar estrictamente a onAudioEnd
+   * 4. Transición automática a RECORDING
+   */
+  useEffect(() => {
+    // Validaciones iniciales
+    if (!interviewStarted) return;
+    if (currentQuestionIndex === undefined) return;
+    if (currentQuestionIndexRef.current === currentQuestionIndex) return; // Evitar re-ejecución
+
+    // REQUERIMIENTO 3: PROHIBICIÓN durante transcripción
+    if (voiceState === 'TRANSCRIBING' || isTranscribing) {
+      console.log('[STATE] Bloqueado: Estado TRANSCRIBING activo - TTS silenciado');
       return;
     }
 
-    // Reset recording-related states when question index changes
-    // Only reset if not currently recording
+    // Actualizar ref
+    currentQuestionIndexRef.current = currentQuestionIndex;
+
+    // Limpiar estados de grabación previos
     if (!isRecording) {
-      
-      // Cancel any ongoing transcription
-      setIsTranscribing(false);
-      setMessage('');
-      
-      // Reset all recording-related states
       setRecordedVideo(null);
       setVideoBlob(null);
-      setVideoBlobType(null); // Reset MIME type
+      setVideoBlobType(null);
       setTranscribedText('');
       setIsReviewMode(false);
-      setAnswerSaved(false); // Reset answer saved flag
+      setAnswerSaved(false);
       setRecordingTime(0);
       setError('');
-      
-      // Clear video stream if exists
+      setMessage('');
+
+      // Limpiar recursos de video
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => {
-          track.stop();
-        });
+        streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
       }
-      
-      // Clear media recorder
       if (mediaRecorderRef.current) {
         if (mediaRecorderRef.current.state === 'recording') {
           try {
             mediaRecorderRef.current.stop();
-          } catch (e) {
-          }
+          } catch (e) {}
         }
         mediaRecorderRef.current = null;
       }
-      
-      // Clear video element
       if (videoRef.current) {
         videoRef.current.srcObject = null;
-        // Revoke any object URLs to free memory
         if (recordedVideo) {
           URL.revokeObjectURL(recordedVideo);
         }
       }
 
-      // Set flag to auto-start recording after cleanup
-      setShouldAutoStartRecording(true);
-    }
-  }, [currentQuestionIndex, isRecording, interviewStarted, allQuestions.length]);
+      // REQUERIMIENTO 2.1: Ejecutar cancel() en cualquier audio activo
+      cancelTTS();
 
-  // Auto-start recording when flag is set
-  useEffect(() => {
-    if (shouldAutoStartRecording && interviewStarted && !isRecording && !recordedVideo) {
-      // Small delay to ensure cleanup is complete
-      const timeout = setTimeout(() => {
-        startUnifiedRecording().catch(err => {
-          setError('Could not start recording automatically. Please try manually.');
+      // REQUERIMIENTO 2.2: Iniciar lectura de nueva pregunta
+      const currentQuestion = currentQuestionIndex < allQuestions.length
+        ? allQuestions[currentQuestionIndex]
+        : null;
+
+      if (currentQuestion) {
+        // REQUERIMIENTO 2.3: Esperar estrictamente a onAudioEnd
+        readQuestionAloud(currentQuestion).then(() => {
+          // REQUERIMIENTO 2.4: Transición automática a RECORDING
+          console.log('[STATE] Transición: READING_QUESTION → RECORDING (después de onAudioEnd)');
+          startUnifiedRecording();
         });
-        setShouldAutoStartRecording(false);
-      }, 500);
-      
-      return () => clearTimeout(timeout);
+      } else {
+        // Para pregunta de video, iniciar grabación directamente
+        startUnifiedRecording();
+      }
     }
-  }, [shouldAutoStartRecording, interviewStarted, isRecording, recordedVideo]);
+  }, [currentQuestionIndex, interviewStarted, allQuestions.length]);
 
   const transcribeVideo = async (retryCount = 0) => {
     if (!videoBlob || isTranscribing) {
       return;
     }
+
+    // REQUERIMIENTO 3: Asegurar que estamos en estado TRANSCRIBING
+    setVoiceState('TRANSCRIBING');
+    setIsTranscribing(true);
 
     // Validate blob before sending
     if (videoBlob.size < 1024) {
@@ -730,10 +917,11 @@ const Interview = () => {
       }
       
       
+      // REQUERIMIENTO 3: Mantener estado TRANSCRIBING durante todo el proceso
       // Step 3: Send S3 URL to backend for transcription
       setMessage('Transcribing audio...');
       
-      const timeoutMs = 180000; // 3 minutes for transcription (longer since file is already uploaded)
+      const timeoutMs = 180000; // 3 minutes for transcription
       const response = await Promise.race([
         api.post('/users/transcribe-video', {
           s3Url: publicUrl
@@ -749,13 +937,14 @@ const Interview = () => {
       ]);
       
 
-      // Only update if we're still on the same question
+      // Solo actualizar si seguimos en la misma pregunta
       if (currentQuestionIndex === questionIndexAtStart) {
         const transcription = response.data.transcription || '';
         
         if (!transcription || transcription.trim().length === 0) {
           setError('Transcription returned empty. The video may not have audio. You can still type your answer manually.');
           setIsReviewMode(true);
+          setVoiceState('REVIEW_MODE');
         } else {
           setTranscribedText(transcription);
           handleAnswerChange(transcription);
@@ -764,12 +953,15 @@ const Interview = () => {
         setMessage('');
         setIsTranscribing(false);
         
-        // Enter review mode after transcription (even if empty)
+        // REQUERIMIENTO 3: Transición a REVIEW_MODE (TTS sigue silenciado)
         setIsReviewMode(true);
+        setVoiceState('REVIEW_MODE');
+        console.log('[STATE] Transición: TRANSCRIBING → REVIEW_MODE');
       } else {
-        // Question changed during transcription, just cancel
+        // Pregunta cambió durante transcripción, cancelar
         setIsTranscribing(false);
         setMessage('');
+        setVoiceState('IDLE');
       }
     } catch (err) {
       // Only update if we're still on the same question
@@ -1248,22 +1440,39 @@ const Interview = () => {
             {/* Question Card (Teleprompter Style) */}
             <div className="glass-card bg-white/60 backdrop-blur-md border border-white/40 rounded-2xl sm:rounded-3xl p-4 sm:p-6 mb-4 sm:mb-6 shadow-xl">
               <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4">
-                <label 
-                  className="block text-gray-900 text-base sm:text-lg md:text-xl font-semibold select-none flex-1 leading-relaxed"
-                  style={{ 
-                    userSelect: 'none',
-                    WebkitUserSelect: 'none',
-                    MozUserSelect: 'none',
-                    msUserSelect: 'none'
-                  }}
-                  onContextMenu={(e) => e.preventDefault()}
-                  onCopy={(e) => e.preventDefault()}
-                  onCut={(e) => e.preventDefault()}
-                >
-                  {isVideoQuestion ? currentQuestion : `${currentQuestionIndex + 1}. ${currentQuestion}`}
-                </label>
+                <div className="flex-1 flex items-center gap-3">
+                  <label 
+                    className="block text-gray-900 text-base sm:text-lg md:text-xl font-semibold select-none flex-1 leading-relaxed"
+                    style={{ 
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      MozUserSelect: 'none',
+                      msUserSelect: 'none'
+                    }}
+                    onContextMenu={(e) => e.preventDefault()}
+                    onCopy={(e) => e.preventDefault()}
+                    onCut={(e) => e.preventDefault()}
+                  >
+                    {isVideoQuestion ? currentQuestion : `${currentQuestionIndex + 1}. ${currentQuestion}`}
+                  </label>
+                  {/* Reading indicator - basado en máquina de estados */}
+                  {voiceState === 'READING_QUESTION' && (
+                    <div className="flex items-center gap-2 text-blue-600">
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent"></div>
+                      <span className="text-sm font-medium">Reading question...</span>
+                    </div>
+                  )}
+                  {/* Transcription indicator */}
+                  {voiceState === 'TRANSCRIBING' && (
+                    <div className="flex items-center gap-2 text-purple-600">
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-purple-600 border-t-transparent"></div>
+                      <span className="text-sm font-medium">Transcribing...</span>
+                    </div>
+                  )}
+                </div>
                 {/* Timer Badge - Integrated in Question Card */}
-                {!isVideoQuestion && (
+                {/* OCULTAR timer de 3 minutos durante la grabación activa para evitar confusión */}
+                {!isVideoQuestion && !isRecording && (
                   <div className={`flex-shrink-0 flex items-center gap-2 rounded-full px-3 sm:px-4 py-1.5 sm:py-2 font-bold text-sm sm:text-base md:text-lg ${
                     timeRemaining < 60 
                       ? 'bg-red-100/80 text-red-700 border border-red-300' 
@@ -1433,12 +1642,23 @@ const Interview = () => {
                         </div>
                       ) : null}
 
-                      {/* Recording Time Display */}
+                      {/* Recording Time Display - Timer principal durante la grabación */}
                       {isRecording && (
                         <div className="text-center">
-                          <p className="text-sm text-gray-600 font-medium">
-                            {Math.floor((60 - recordingTime) / 60)}:{(60 - recordingTime) % 60 < 10 ? '0' : ''}{Math.abs((60 - recordingTime) % 60)} / 1:00
-                          </p>
+                          <div className="flex flex-col items-center gap-1">
+                            <p className="text-xs text-gray-500 font-medium">Tiempo restante / Remaining time</p>
+                            <div className={`flex items-center gap-2 rounded-full px-4 sm:px-6 py-2 sm:py-3 font-bold text-lg sm:text-2xl md:text-3xl ${
+                              (60 - recordingTime) <= 10
+                                ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/50' 
+                                : (60 - recordingTime) <= 20
+                                ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/50'
+                                : 'bg-blue-500 text-white shadow-lg shadow-blue-500/50'
+                            }`}>
+                              <span>⏱️</span>
+                              <span>{formatRecordingTimeRemaining(recordingTime)}</span>
+                              <span className="text-sm sm:text-base opacity-75">/ 1:00</span>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1572,12 +1792,23 @@ const Interview = () => {
                       )}
                     </div>
 
-                    {/* Recording Time Display */}
+                    {/* Recording Time Display - Timer principal durante la grabación */}
                     {isRecording && (
                       <div className="mt-4 text-center">
-                        <p className="text-sm text-gray-600 font-medium">
-                          Recording: {Math.floor((60 - recordingTime) / 60)}:{(60 - recordingTime) % 60 < 10 ? '0' : ''}{Math.abs((60 - recordingTime) % 60)} / 1:00
-                        </p>
+                        <div className="flex flex-col items-center gap-1">
+                          <p className="text-xs text-gray-500 font-medium">Tiempo restante / Remaining time</p>
+                          <div className={`flex items-center gap-2 rounded-full px-4 sm:px-6 py-2 sm:py-3 font-bold text-lg sm:text-2xl md:text-3xl ${
+                            (60 - recordingTime) <= 10
+                              ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/50' 
+                              : (60 - recordingTime) <= 20
+                              ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/50'
+                              : 'bg-blue-500 text-white shadow-lg shadow-blue-500/50'
+                          }`}>
+                            <span>⏱️</span>
+                            <span>{formatRecordingTimeRemaining(recordingTime)}</span>
+                            <span className="text-sm sm:text-base opacity-75">/ 1:00</span>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>

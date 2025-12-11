@@ -510,6 +510,88 @@ export const evaluateMultipleIntelligences = (responses) => {
   return { totalScore, results };
 };
 
+/**
+ * Filtro de post-procesamiento para detectar y eliminar alucinaciones comunes de Whisper
+ * Estas frases aparecen cuando hay silencios o ruido de fondo
+ */
+function filterWhisperHallucinations(text) {
+  if (!text || typeof text !== 'string') {
+    return '';
+  }
+
+  // Lista de frases basura comunes que Whisper genera en inglés
+  const hallucinationPatterns = [
+    // Frases sobre subtítulos y transcripciones
+    /subtitle\s+by/i,
+    /subtitle/i,
+    /transcribed\s+by/i,
+    /transcription\s+by/i,
+    /caption\s+by/i,
+    /caption/i,
+    
+    // Frases sobre el hablante
+    /the\s+speaker\s+is/i,
+    /speaker\s+is\s+answering/i,
+    /the\s+speaker\s+is\s+answering\s+questions/i,
+    /speaker\s+is\s+answering\s+questions\s+in\s+english/i,
+    /the\s+speaker\s+is\s+answering\s+questions\s+in\s+english/i,
+    
+    // Frases sobre idioma
+    /answering\s+questions\s+in\s+english/i,
+    /speaking\s+in\s+english/i,
+    /the\s+language\s+is/i,
+    
+    // Frases genéricas de relleno
+    /thank\s+you\s+for\s+watching/i,
+    /please\s+subscribe/i,
+    /like\s+and\s+subscribe/i,
+    /don't\s+forget\s+to\s+subscribe/i,
+    
+    // Frases sobre silencio o ruido
+    /background\s+noise/i,
+    /silence/i,
+    /no\s+audio/i,
+    /audio\s+unavailable/i,
+  ];
+
+  // Dividir el texto en líneas o frases
+  let filteredText = text;
+  
+  // Eliminar líneas completas que coincidan con patrones de alucinación
+  const lines = filteredText.split(/\n|\./).filter(line => {
+    const trimmedLine = line.trim();
+    if (!trimmedLine) return false; // Eliminar líneas vacías
+    
+    // Verificar si la línea completa es una alucinación
+    for (const pattern of hallucinationPatterns) {
+      if (pattern.test(trimmedLine)) {
+        return false; // Eliminar esta línea
+      }
+    }
+    
+    // Si la línea es muy corta (menos de 3 caracteres) y contiene solo palabras en inglés comunes, eliminarla
+    if (trimmedLine.length < 3) {
+      return false;
+    }
+    
+    return true;
+  });
+
+  // Reconstruir el texto sin las líneas eliminadas
+  filteredText = lines.join('. ').trim();
+  
+  // Eliminar patrones que aparezcan dentro del texto (no solo al inicio/fin)
+  for (const pattern of hallucinationPatterns) {
+    filteredText = filteredText.replace(pattern, '').trim();
+  }
+  
+  // Limpiar espacios múltiples y puntuación duplicada
+  filteredText = filteredText.replace(/\s+/g, ' ').trim();
+  filteredText = filteredText.replace(/\.{2,}/g, '.').trim();
+  
+  return filteredText;
+}
+
 // Transcribe audio from video using Whisper API
 export async function transcribeVideoAudio(filePath) {
   let transcriptionAttempts = 0;
@@ -537,10 +619,11 @@ export async function transcribeVideoAudio(filePath) {
       const transcriptionPromise = openai.audio.transcriptions.create({
         file: fileStream,
         model: 'whisper-1',
-        language: 'en',
+        language: 'es', // Forzar español para evitar alucinaciones en inglés
         response_format: 'text',
-        // Add prompt to help with accuracy
-        prompt: 'This is an interview response. The speaker is answering questions in English.'
+        temperature: 0, // Reducir alucinaciones: 0 = más determinista, menos creativo
+        // Prompt en español para guiar el modelo y reducir alucinaciones
+        prompt: 'Esta es una respuesta de entrevista. El hablante está respondiendo preguntas en español. Solo transcribe el habla real del entrevistado, no agregues texto adicional.'
       });
       
       // Race between transcription and timeout (90 seconds for larger files)
@@ -557,7 +640,14 @@ export async function transcribeVideoAudio(filePath) {
         throw new Error('Transcription returned empty result. The video may not contain audible speech.');
       }
       
-      return trimmedText;
+      // FILTRO DE POST-PROCESAMIENTO: Detectar y eliminar frases basura comunes de Whisper
+      const filteredText = filterWhisperHallucinations(trimmedText);
+      
+      if (!filteredText || filteredText.trim().length === 0) {
+        throw new Error('Transcription returned empty result after filtering. The video may not contain audible speech.');
+      }
+      
+      return filteredText;
     } catch (error) {
       // If it's a file format error, don't retry
       if (error.message.includes('format') || 
