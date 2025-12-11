@@ -1,9 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../utils/axios';
+import { AuthContext } from '../contexts/AuthContext';
 
 const Interview = () => {
+  const { user } = useContext(AuthContext);
+  const isAdmin = user?.role === 'admin';
   const [questions, setQuestions] = useState([]);
   const [allQuestions, setAllQuestions] = useState([]); // Includes default questions
   const [answers, setAnswers] = useState([]);
@@ -35,6 +38,7 @@ const Interview = () => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [answerSaved, setAnswerSaved] = useState(false); // Track if answer was saved
   const [videoAnswers, setVideoAnswers] = useState([]); // Store video answers for each question
+  const [shouldAutoStartRecording, setShouldAutoStartRecording] = useState(false); // Flag to auto-start recording
 
   // Default questions
   const defaultQuestions = [
@@ -188,6 +192,8 @@ const Interview = () => {
     }
     setTimeRemaining(180); // 3 minutes
     setTimerActive(true); // Start timer automatically
+    // Set flag to auto-start recording when question is set
+    setShouldAutoStartRecording(true);
   };
 
   const handleAnswerChange = (value) => {
@@ -569,6 +575,11 @@ const Interview = () => {
 
   // Reset recording states when question changes
   useEffect(() => {
+    // Skip if interview hasn't started yet
+    if (!interviewStarted) {
+      return;
+    }
+
     // Reset recording-related states when question index changes
     // Only reset if not currently recording
     if (!isRecording) {
@@ -614,9 +625,26 @@ const Interview = () => {
           URL.revokeObjectURL(recordedVideo);
         }
       }
-    } else {
+
+      // Set flag to auto-start recording after cleanup
+      setShouldAutoStartRecording(true);
     }
-  }, [currentQuestionIndex, isRecording]);
+  }, [currentQuestionIndex, isRecording, interviewStarted, allQuestions.length]);
+
+  // Auto-start recording when flag is set
+  useEffect(() => {
+    if (shouldAutoStartRecording && interviewStarted && !isRecording && !recordedVideo) {
+      // Small delay to ensure cleanup is complete
+      const timeout = setTimeout(() => {
+        startUnifiedRecording().catch(err => {
+          setError('Could not start recording automatically. Please try manually.');
+        });
+        setShouldAutoStartRecording(false);
+      }, 500);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [shouldAutoStartRecording, interviewStarted, isRecording, recordedVideo]);
 
   const transcribeVideo = async (retryCount = 0) => {
     if (!videoBlob || isTranscribing) {
@@ -1148,9 +1176,11 @@ const Interview = () => {
           <h1 className="text-4xl font-bold text-gray-900 mb-6">Interview Results</h1>
 
           <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
-            <div className="text-center mb-6">
-              <p className="text-3xl font-bold text-blue-600">Score: {results.score}%</p>
-            </div>
+            {isAdmin && results.score !== undefined && (
+              <div className="text-center mb-6">
+                <p className="text-3xl font-bold text-blue-600">Score: {results.score}%</p>
+              </div>
+            )}
 
             {results.analysis && results.analysis.map((item, index) => (
               <div key={index} className="mb-6 p-6 bg-gray-50 rounded-lg border border-gray-200">
@@ -1158,10 +1188,14 @@ const Interview = () => {
                   Question {index + 1}: {results.questions[index]}
                 </p>
                 <p className="text-gray-600 mb-3">Your answer: {results.responses[index]}</p>
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-blue-600">Score: {item.score}/100</span>
-                </div>
-                <p className="text-sm text-gray-700 mt-3">{item.explanation}</p>
+                {isAdmin && item.score !== undefined && (
+                  <div className="flex items-center gap-4">
+                    <span className="font-semibold text-blue-600">Score: {item.score}/100</span>
+                  </div>
+                )}
+                {item.explanation && (
+                  <p className="text-sm text-gray-700 mt-3">{item.explanation}</p>
+                )}
               </div>
             ))}
           </div>
@@ -1371,7 +1405,8 @@ const Interview = () => {
                         Previous
                       </button>
 
-                      {!isRecording && !recordedVideo ? (
+                      {/* Hide play button if auto-starting or if already recording */}
+                      {!isRecording && !recordedVideo && !shouldAutoStartRecording ? (
                         <button
                           type="button"
                           onClick={startUnifiedRecording}
@@ -1391,6 +1426,11 @@ const Interview = () => {
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
                           </svg>
                         </button>
+                      ) : shouldAutoStartRecording ? (
+                        // Show loading state while auto-starting
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:h-10 border-2 border-blue-600 border-t-transparent"></div>
+                        </div>
                       ) : null}
 
                       {/* Recording Time Display */}
@@ -1492,7 +1532,8 @@ const Interview = () => {
                   <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl -mt-4 sm:-mt-8 relative z-20">
                     <div className="flex items-center justify-center gap-3 sm:gap-4">
                       {/* Main Record/Stop Button (Center) */}
-                      {!isRecording && !recordedVideo ? (
+                      {/* Hide play button if auto-starting or if already recording */}
+                      {!isRecording && !recordedVideo && !shouldAutoStartRecording ? (
                         <button
                           type="button"
                           onClick={startUnifiedRecording}
@@ -1512,6 +1553,11 @@ const Interview = () => {
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
                           </svg>
                         </button>
+                      ) : shouldAutoStartRecording ? (
+                        // Show loading state while auto-starting
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-8 w-8 sm:h-10 sm:h-10 border-2 border-blue-600 border-t-transparent"></div>
+                        </div>
                       ) : null}
 
                       {/* Next Button (Right) - Solo visible si hay respuesta */}

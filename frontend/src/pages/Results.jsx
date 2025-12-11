@@ -438,19 +438,19 @@ const Results = () => {
                   </div>
                 </div>
                 <div className="space-y-4">
-                  <div className="p-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-white">
-                    <p className="text-sm opacity-90 mb-1">Average Score</p>
-                    <p className="text-3xl font-bold">
-                      {isAdmin ? (
-                        profile?.cvAnalyzed && profile?.interviewCompleted
+                  {isAdmin && (
+                    <div className="p-4 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-white">
+                      <p className="text-sm opacity-90 mb-1">Average Score</p>
+                      <p className="text-3xl font-bold">
+                        {profile?.cvAnalyzed && profile?.interviewCompleted
                           ? Math.round((cvScore + interviewScore) / 2)
                           : profile?.cvAnalyzed
                           ? cvScore
-                          : interviewScore
-                      ) : '—'}
-                      {isAdmin && '%'}
-                    </p>
-                  </div>
+                          : interviewScore}
+                        %
+                      </p>
+                    </div>
+                  )}
                   <div className="flex gap-3">
                     <Link
                       to="/dashboard"

@@ -723,13 +723,31 @@ router.get("/interview-responses", authMiddleware, async (req, res) => {
 
     const allQuestions = [...(user.questions || []), ...defaultQuestions];
 
-    res.json({
+    // Si el usuario no es admin, no devolver el score ni los scores individuales en el análisis
+    const responseData = {
       questions: allQuestions,
       responses: user.interviewResponses || [],
       video: user.interviewVideo || null,
-      analysis: user.interviewAnalysis || [],
-      score: user.interviewScore || 0
-    });
+      analysis: user.interviewAnalysis || []
+    };
+
+    // Solo incluir el score si el usuario es admin
+    if (user.role === 'admin') {
+      responseData.score = user.interviewScore || 0;
+    }
+
+    // Si no es admin, remover los scores del análisis
+    if (user.role !== 'admin' && Array.isArray(responseData.analysis)) {
+      responseData.analysis = responseData.analysis.map(item => {
+        if (typeof item === 'object' && item !== null) {
+          const { score, ...rest } = item;
+          return rest;
+        }
+        return item;
+      });
+    }
+
+    res.json(responseData);
   } catch (error) {
     res.status(500).json({ message: "Internal server error" });
   }
@@ -743,7 +761,14 @@ router.get("/profile", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Usuario no encontrado" });
     }
 
-    res.json(user);
+    // Si el usuario no es admin, no devolver los scores
+    const userData = user.toObject();
+    if (user.role !== 'admin') {
+      delete userData.score;
+      delete userData.interviewScore;
+    }
+
+    res.json(userData);
   } catch (error) {
     res.status(500).json({ message: "Error interno del servidor" });
   }
