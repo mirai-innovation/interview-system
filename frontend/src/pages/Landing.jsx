@@ -83,30 +83,22 @@ const Landing = () => {
             />
           </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4 sm:mb-6">
-            Applicant Evaluation and
+            Intelligent Evaluation Platform and
             <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"> Selection System</span>
           </h1>
           <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 px-2 max-w-3xl mx-auto">
-            Complementary platform for the selection process of our academic programs.
+            Intelligent platform for the selection process of our academic programs.
             Evaluate your competencies through automated CV analysis and personalized interviews
             to become part of our excellence programs.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center flex-wrap px-4">
             {!user && (
-              <>
-                <Link
-                  to="/register"
-                  className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-xl text-base sm:text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:scale-105"
-                >
-                  Start Selection Process
-                </Link>
-                <Link
-                  to="/login"
-                  className="w-full sm:w-auto bg-white hover:bg-gray-50 text-blue-600 px-8 py-4 rounded-xl text-base sm:text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl border-2 border-blue-600 hover:border-blue-700 transform hover:scale-105"
-                >
-                  Continue Evaluation
-                </Link>
-              </>
+              <Link
+                to="/register"
+                className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-xl text-base sm:text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:scale-105"
+              >
+                Register
+              </Link>
             )}
             {user && (
               <Link
@@ -248,6 +240,7 @@ const Landing = () => {
                     Create your account as an applicant and upload your CV in PDF format.
                     Our system will automatically analyze it
                     to evaluate your initial profile.
+                    Available academic levels: High School Level, University Level, Postgraduate Level.
                   </p>
                 </div>
               </div>
@@ -306,7 +299,7 @@ const Landing = () => {
               to="/register"
               className="inline-block bg-white text-blue-600 px-8 py-4 rounded-xl text-lg font-semibold hover:bg-gray-50 transition-all duration-300 shadow-2xl hover:shadow-3xl transform hover:scale-105"
             >
-              Start Selection Process
+              Register
             </Link>
           )}
           {user && (
@@ -394,7 +387,7 @@ const Landing = () => {
             </div>
           </div>
           <div className="border-t border-gray-800 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 Mirai Innovation Research Institute. All rights reserved.</p>
+            <p>&copy; 2025 Mirai Innovation Research Institute. All rights reserved.</p>
             <p className="mt-2 text-sm">
               This platform is complementary to the selection process of our academic programs.
             </p>

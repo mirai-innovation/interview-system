@@ -1,6 +1,7 @@
 import { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
+import logo from '../assets/logo.png';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -29,6 +30,13 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4 py-8">
       <div className="bg-white p-6 sm:p-8 rounded-lg shadow-md w-full max-w-md">
+        <div className="flex justify-center mb-4">
+          <img
+            src={logo}
+            alt="Mirai Innovation"
+            className="h-10 w-auto object-contain"
+          />
+        </div>
         <h2 className="text-xl sm:text-2xl font-bold mb-6 text-center">Sign In</h2>
         
         {error && (

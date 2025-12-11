@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../utils/axios';
+import logo from '../assets/logo.png';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -46,6 +47,13 @@ const Register = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4 py-8">
       <div className="bg-white p-6 sm:p-8 rounded-lg shadow-md w-full max-w-md">
+        <div className="flex justify-center mb-4">
+          <img
+            src={logo}
+            alt="Mirai Innovation"
+            className="h-10 w-auto object-contain"
+          />
+        </div>
         <h2 className="text-xl sm:text-2xl font-bold mb-6 text-center">Register</h2>
         
         {error && (
@@ -142,9 +150,9 @@ const Register = () => {
               required
             >
               <option value="">Select...</option>
-              <option value="Secundaria">High School</option>
-              <option value="Superior">Higher Education</option>
-              <option value="Postgrado">Graduate</option>
+              <option value="High School Level">High School Level</option>
+              <option value="University Level">University Level</option>
+              <option value="Postgraduate Level">Postgraduate Level</option>
             </select>
           </div>
 
@@ -163,7 +171,7 @@ const Register = () => {
               <option value="MIRI">MIRI</option>
               <option value="EMFUTECH">EMFUTECH</option>
               <option value="JCTI">JCTI</option>
-              <option value="MIRAITEACH">MIRAITEACH</option>
+              <option value="OTHER">OTHER</option>
             </select>
           </div>
 

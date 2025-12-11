@@ -13,7 +13,7 @@ const Interview = () => {
   const [interviewStarted, setInterviewStarted] = useState(false);
   const [interviewCompleted, setInterviewCompleted] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(180); // 3 minutes per question (180 seconds)
+  const [timeRemaining, setTimeRemaining] = useState(60); // 1 minute correction timer
   const [timerActive, setTimerActive] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
@@ -39,6 +39,8 @@ const Interview = () => {
   const [answerSaved, setAnswerSaved] = useState(false); // Track if answer was saved
   const [videoAnswers, setVideoAnswers] = useState([]); // Store video answers for each question
   const [shouldAutoStartRecording, setShouldAutoStartRecording] = useState(false); // Flag to auto-start recording
+  const [countdownBeforeRecord, setCountdownBeforeRecord] = useState(0); // Visible 5s countdown before recording
+  const countdownIntervalRef = useRef(null);
 
   // ============================================================================
   // STATE MACHINE: TTS/STT Voice Interaction Control
@@ -160,6 +162,8 @@ const Interview = () => {
         setAllQuestions(combinedQuestions);
         
         // Load saved answers if they exist
+        // Nota: El video está en índice 0, las respuestas de texto en índices 1+
+        // response.data.interviewVideo contiene el video (si existe)
         if (response.data.interviewResponses && Array.isArray(response.data.interviewResponses)) {
           const savedAnswers = [...response.data.interviewResponses];
           // Ensure array has exactly the correct length (trim if too long, pad if too short)
@@ -174,19 +178,26 @@ const Interview = () => {
           }
           setAnswers(savedAnswers);
           
-          // Find the first unanswered question
-          const firstEmptyIndex = savedAnswers.findIndex(answer => !answer || answer.trim() === '');
-          if (firstEmptyIndex !== -1) {
-            setCurrentQuestionIndex(firstEmptyIndex);
-          } else {
-            // All questions answered, go to video question
-            setCurrentQuestionIndex(combinedQuestions.length);
+          // Cargar video si existe (índice 0)
+          if (response.data.interviewVideo) {
+            const videoAnswersArray = [response.data.interviewVideo];
+            setVideoAnswers(videoAnswersArray);
+            // Si el video es una URL (string), establecerlo como recordedVideo para mostrarlo
+            if (typeof response.data.interviewVideo === 'string') {
+              setRecordedVideo(response.data.interviewVideo);
+              setIsReviewMode(true); // Mostrar en modo review si ya está guardado
+            }
           }
+          
+          // SIEMPRE empezar con video (índice 0) - sin importar si está guardado o no
+          // El usuario debe ver el video primero siempre
+          setCurrentQuestionIndex(0);
         } else {
           setAnswers(new Array(combinedQuestions.length).fill(''));
+          setCurrentQuestionIndex(0); // Empezar con video (índice 0)
         }
         
-        setTimeRemaining(180); // Reset timer to 3 minutes
+        setTimeRemaining(60); // Correction window after transcription
       }
     } catch (error) {
     }
@@ -206,32 +217,49 @@ const Interview = () => {
    * 3. Transición automática a RECORDING
    */
   const startInterview = async () => {
+    console.log('[START INTERVIEW] Iniciando entrevista - SIEMPRE empezar con video (índice 0)');
     setInterviewStarted(true);
     
-    // Determinar índice de pregunta inicial
-    let questionIndex = 0;
-    if (answers.length > 0 && answers.some(a => a && a.trim() !== '')) {
-      const firstEmptyIndex = answers.findIndex(answer => !answer || answer.trim() === '');
-      if (firstEmptyIndex !== -1) {
-        questionIndex = firstEmptyIndex;
-      }
-    }
+    // SIEMPRE empezar con video (índice 0) - sin importar si está guardado o no
+    const questionIndex = 0;
+    
+    console.log('[START INTERVIEW] Estableciendo índice en:', questionIndex);
+    console.log('[START INTERVIEW] Video guardado?', videoAnswers.length > 0 && videoAnswers[0] ? 'Sí' : 'No');
     
     setCurrentQuestionIndex(questionIndex);
     currentQuestionIndexRef.current = questionIndex;
-    setTimeRemaining(180);
-    setTimerActive(true);
+    setTimeRemaining(60); // correction window will run after transcription
+    setTimerActive(false); // timer starts after transcription, not at start
     
-    // REQUERIMIENTO 1.1: Disparar inmediatamente TTS de Pregunta 1
-    if (allQuestions.length > 0 && questionIndex < allQuestions.length) {
-      const questionText = allQuestions[questionIndex];
-      
-      // REQUERIMIENTO 1.2: Esperar estrictamente a onAudioEnd
-      await readQuestionAloud(questionText);
-      
-      // REQUERIMIENTO 1.3: Transición automática a RECORDING
-      // Solo iniciar grabación después de que onAudioEnd haya ocurrido
-      console.log('[STATE] Transición: READING_QUESTION → RECORDING (después de onAudioEnd)');
+    // Limpiar estados previos
+    setIsReviewMode(false);
+    setRecordedVideo(null);
+    setVideoBlob(null);
+    setTranscribedText('');
+    setError('');
+    setMessage('');
+    
+    // Verificar si hay video guardado
+    if (videoAnswers.length > 0 && videoAnswers[0]) {
+      console.log('[START INTERVIEW] Video guardado encontrado, mostrando en modo review');
+      // Hay video guardado, mostrarlo en modo review
+      if (typeof videoAnswers[0] === 'string') {
+        // Es una URL (video guardado desde backend)
+        setRecordedVideo(videoAnswers[0]);
+        setIsReviewMode(true);
+        setVoiceState('REVIEW_MODE');
+      } else {
+        // Es un Blob (video grabado en esta sesión)
+        const videoURL = URL.createObjectURL(videoAnswers[0]);
+        setRecordedVideo(videoURL);
+        setVideoBlob(videoAnswers[0]);
+        setIsReviewMode(true);
+        setVoiceState('REVIEW_MODE');
+      }
+    } else {
+      // No hay video guardado, iniciar grabación directamente sin TTS
+      console.log('[START INTERVIEW] No hay video guardado, iniciando grabación');
+      setIsReviewMode(false);
       startUnifiedRecording();
     }
   };
@@ -314,65 +342,25 @@ const Interview = () => {
     // Reset ref para permitir lectura de nueva pregunta
     currentQuestionIndexRef.current = null;
     
-    // Avanzar a siguiente pregunta (esto disparará el useEffect de transición)
-    if (currentQuestionIndex < allQuestions.length - 1) {
+    // Avanzar a siguiente pregunta
+    // Índice 0 = video, índices 1 a allQuestions.length = preguntas de texto
+    if (currentQuestionIndex === 0) {
+      // Desde video (0) ir a primera pregunta de texto (1)
+      setCurrentQuestionIndex(1);
+    setTimeRemaining(60);
+    setTimerActive(false); // se activará tras la transcripción
+    } else if (currentQuestionIndex < allQuestions.length) {
+      // Avanzar a siguiente pregunta de texto
       setCurrentQuestionIndex(currentQuestionIndex + 1);
-      setTimeRemaining(180);
-      setTimerActive(true);
-    } else if (currentQuestionIndex === allQuestions.length - 1) {
-      setCurrentQuestionIndex(allQuestions.length);
+    setTimeRemaining(60);
+    setTimerActive(false); // se activará tras la transcripción
+    } else if (currentQuestionIndex === allQuestions.length) {
+      // Última pregunta de texto, no hay más preguntas
       setTimerActive(false);
     }
   };
 
-  const handlePreviousQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      // REQUERIMIENTO 2.1: Cancelar cualquier TTS activo (Estado de Transición)
-      cancelTTS();
-      
-      // Stop any active recordings
-      if (isRecording) {
-        stopUnifiedRecording();
-      }
-      
-      // Limpiar estado de transcripción
-      setIsTranscribing(false);
-      setVoiceState('IDLE'); // Reset estado antes de cambiar pregunta
-      
-      // Reset states when going back
-      setRecordedVideo(null);
-      setVideoBlob(null);
-      setVideoBlobType(null);
-      setTranscribedText('');
-      setIsReviewMode(false);
-      setRecordingTime(0);
-      setError('');
-      setMessage('');
-      
-      // Clear video stream if exists
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-      }
-      
-      // Clear media recorder
-      if (mediaRecorderRef.current) {
-        mediaRecorderRef.current = null;
-      }
-      
-      // Clear video element
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
-      
-      // Reset ref para permitir lectura de pregunta anterior
-      currentQuestionIndexRef.current = null;
-      
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
-      setTimeRemaining(180); // Reset timer to 3 minutes
-      setTimerActive(true); // Auto-start timer when going back
-    }
-  };
+  // Navigation disabled (Next/Previous removed)
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -534,6 +522,12 @@ const Interview = () => {
 
   // Unified recording function - starts video + audio recording with speech recognition
   const startUnifiedRecording = async () => {
+    // If a pre-recording countdown is running, stop it
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+      setCountdownBeforeRecord(0);
+    }
     try {
       // Reset states
       setTranscribedText('');
@@ -695,7 +689,7 @@ const Interview = () => {
    * 2. PROTECCIÓN: No interrumpir proceso de transcripción con nuevos eventos de audio
    */
   useEffect(() => {
-    const isVideoQuestion = currentQuestionIndex !== undefined && allQuestions.length > 0 && currentQuestionIndex >= allQuestions.length;
+    const isVideoQuestion = currentQuestionIndex === 0; // Video está en índice 0
     
     // Validaciones
     if (!videoBlob || isRecording || isTranscribing || isReviewMode || answerSaved) {
@@ -724,7 +718,7 @@ const Interview = () => {
           !isReviewMode && 
           !answerSaved && 
           currentQuestionIndex !== undefined && 
-          !isVideoQuestion) {
+          currentQuestionIndex > 0) { // Preguntas de texto empiezan en índice 1
         transcribeVideo();
       }
     }, 200);
@@ -810,21 +804,58 @@ const Interview = () => {
       // REQUERIMIENTO 2.1: Ejecutar cancel() en cualquier audio activo
       cancelTTS();
 
-      // REQUERIMIENTO 2.2: Iniciar lectura de nueva pregunta
-      const currentQuestion = currentQuestionIndex < allQuestions.length
-        ? allQuestions[currentQuestionIndex]
-        : null;
-
-      if (currentQuestion) {
-        // REQUERIMIENTO 2.3: Esperar estrictamente a onAudioEnd
-        readQuestionAloud(currentQuestion).then(() => {
-          // REQUERIMIENTO 2.4: Transición automática a RECORDING
-          console.log('[STATE] Transición: READING_QUESTION → RECORDING (después de onAudioEnd)');
+      // REQUERIMIENTO 2.2: Iniciar lectura de nueva pregunta o video
+      if (currentQuestionIndex === 0) {
+        // Video (índice 0): SIEMPRE mostrar el video primero
+        // Verificar si hay video guardado
+        if (videoAnswers.length > 0 && videoAnswers[0]) {
+          // Hay video guardado, mostrarlo en modo review
+          if (typeof videoAnswers[0] === 'string') {
+            // Es una URL (video guardado desde backend)
+            setRecordedVideo(videoAnswers[0]);
+            setIsReviewMode(true);
+            setVoiceState('REVIEW_MODE');
+          } else {
+            // Es un Blob (video grabado en esta sesión)
+            const videoURL = URL.createObjectURL(videoAnswers[0]);
+            setRecordedVideo(videoURL);
+            setVideoBlob(videoAnswers[0]);
+            setIsReviewMode(true);
+            setVoiceState('REVIEW_MODE');
+          }
+        } else {
+          // No hay video guardado, iniciar grabación directamente sin TTS
+          console.log('[STATE] Iniciando video de autopresentación (índice 0)');
+          setIsReviewMode(false); // Asegurar que no esté en modo review
           startUnifiedRecording();
-        });
-      } else {
-        // Para pregunta de video, iniciar grabación directamente
-        startUnifiedRecording();
+        }
+      } else if (currentQuestionIndex > 0 && currentQuestionIndex <= allQuestions.length) {
+        // Pregunta de texto: índice 1 a allQuestions.length
+        // La pregunta está en allQuestions[currentQuestionIndex - 1]
+        const currentQuestion = allQuestions[currentQuestionIndex - 1];
+        if (currentQuestion) {
+          // REQUERIMIENTO 2.3: Esperar estrictamente a onAudioEnd
+          readQuestionAloud(currentQuestion).then(() => {
+            // REQUERIMIENTO 2.4: Pausa de 5s visible antes de grabar
+            setCountdownBeforeRecord(5);
+            if (countdownIntervalRef.current) {
+              clearInterval(countdownIntervalRef.current);
+            }
+            countdownIntervalRef.current = setInterval(() => {
+              setCountdownBeforeRecord(prev => {
+                if (prev <= 1) {
+                  clearInterval(countdownIntervalRef.current);
+                  countdownIntervalRef.current = null;
+                  setCountdownBeforeRecord(0);
+                  console.log('[STATE] Countdown finished → starting recording');
+                  startUnifiedRecording();
+                  return 0;
+                }
+                return prev - 1;
+              });
+            }, 1000);
+          });
+        }
       }
     }
   }, [currentQuestionIndex, interviewStarted, allQuestions.length]);
@@ -957,6 +988,11 @@ const Interview = () => {
         setIsReviewMode(true);
         setVoiceState('REVIEW_MODE');
         console.log('[STATE] Transición: TRANSCRIBING → REVIEW_MODE');
+      // Correction timer: 1 minute to edit after transcription (only for text questions)
+      if (currentQuestionIndex > 0) {
+        setTimeRemaining(60);
+        setTimerActive(true);
+      }
       } else {
         // Pregunta cambió durante transcripción, cancelar
         setIsTranscribing(false);
@@ -1191,11 +1227,11 @@ const Interview = () => {
     }
   };
 
-  const isLastTextQuestion = currentQuestionIndex === allQuestions.length - 1;
-  const isVideoQuestion = currentQuestionIndex >= allQuestions.length; // Video question is after all text questions
+  const isVideoQuestion = currentQuestionIndex === 0; // Video question is FIRST (index 0)
+  const isLastTextQuestion = currentQuestionIndex === allQuestions.length; // Last text question is at index allQuestions.length
   const currentQuestion = isVideoQuestion 
     ? "Please introduce yourself in 1 minute, speaking directly about your projects and skills. Record a video using your webcam."
-    : allQuestions[currentQuestionIndex];
+    : allQuestions[currentQuestionIndex - 1]; // Text questions start at index 1, so subtract 1 to get the question
 
   // Show completed message if interview is already completed
   if (interviewCompleted) {
@@ -1316,7 +1352,9 @@ const Interview = () => {
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <span className="text-gray-700 text-sm sm:text-base">Answer each question within the 3-minute time limit</span>
+                  <span className="text-gray-700 text-sm sm:text-base">
+                    Flow: starts with a 1-minute video introduction (profile, projects, skills). Then each question is read aloud and the camera starts automatically.
+                  </span>
                 </li>
                 <li className="flex items-start gap-3">
                   <div className="flex-shrink-0 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center mt-0.5">
@@ -1324,7 +1362,9 @@ const Interview = () => {
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <span className="text-gray-700 text-sm sm:text-base">Copying and pasting text is not allowed</span>
+                  <span className="text-gray-700 text-sm sm:text-base">
+                    You have 1 minute to answer each question on video. The timer starts as soon as the question finishes being read.
+                  </span>
                 </li>
                 <li className="flex items-start gap-3">
                   <div className="flex-shrink-0 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center mt-0.5">
@@ -1332,7 +1372,9 @@ const Interview = () => {
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <span className="text-gray-700 text-sm sm:text-base">You can navigate between questions using Previous/Next buttons</span>
+                  <span className="text-gray-700 text-sm sm:text-base">
+                    After transcription ends, you have 1 minute to review and edit the text before moving to the next question.
+                  </span>
                 </li>
                 <li className="flex items-start gap-3">
                   <div className="flex-shrink-0 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center mt-0.5">
@@ -1340,7 +1382,9 @@ const Interview = () => {
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   </div>
-                  <span className="text-gray-700 text-sm sm:text-base">The final question requires a 1-minute video introduction</span>
+                  <span className="text-gray-700 text-sm sm:text-base">
+                    Everything is recorded on video. Copy/paste is not allowed.
+                  </span>
                 </li>
               </ul>
             </div>
@@ -1408,17 +1452,17 @@ const Interview = () => {
             <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
               <span className="font-medium">
                 {isVideoQuestion 
-                  ? `Video Introduction (Final Question)`
-                  : `Question ${currentQuestionIndex + 1} of ${allQuestions.length + 1}`}
+                  ? `Video Introduction (First Question)`
+                  : `Question ${currentQuestionIndex} of ${allQuestions.length + 1}`}
               </span>
               <span className="font-semibold">
-                {Math.round(((isVideoQuestion ? allQuestions.length + 1 : currentQuestionIndex + 1) / (allQuestions.length + 1)) * 100)}%
+                {Math.round(((currentQuestionIndex + 1) / (allQuestions.length + 1)) * 100)}%
               </span>
             </div>
             <div className="w-full bg-white/20 backdrop-blur-sm rounded-full h-2 overflow-hidden">
               <div
                 className="bg-gradient-to-r from-blue-600 to-purple-600 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${((isVideoQuestion ? allQuestions.length + 1 : currentQuestionIndex + 1) / (allQuestions.length + 1)) * 100}%` }}
+                style={{ width: `${((currentQuestionIndex + 1) / (allQuestions.length + 1)) * 100}%` }}
               ></div>
             </div>
           </div>
@@ -1453,7 +1497,7 @@ const Interview = () => {
                     onCopy={(e) => e.preventDefault()}
                     onCut={(e) => e.preventDefault()}
                   >
-                    {isVideoQuestion ? currentQuestion : `${currentQuestionIndex + 1}. ${currentQuestion}`}
+                    {isVideoQuestion ? currentQuestion : `${currentQuestionIndex}. ${currentQuestion}`}
                   </label>
                   {/* Reading indicator - basado en máquina de estados */}
                   {voiceState === 'READING_QUESTION' && (
@@ -1470,9 +1514,8 @@ const Interview = () => {
                     </div>
                   )}
                 </div>
-                {/* Timer Badge - Integrated in Question Card */}
-                {/* OCULTAR timer de 3 minutos durante la grabación activa para evitar confusión */}
-                {!isVideoQuestion && !isRecording && (
+                {/* Correction Timer Badge - visible during review (after transcription) */}
+                {isReviewMode && !isVideoQuestion && (
                   <div className={`flex-shrink-0 flex items-center gap-2 rounded-full px-3 sm:px-4 py-1.5 sm:py-2 font-bold text-sm sm:text-base md:text-lg ${
                     timeRemaining < 60 
                       ? 'bg-red-100/80 text-red-700 border border-red-300' 
@@ -1480,6 +1523,12 @@ const Interview = () => {
                   }`}>
                     <span>⏱️</span>
                     <span>{formatTime(timeRemaining)}</span>
+                  </div>
+                )}
+                {!isVideoQuestion && countdownBeforeRecord > 0 && (
+                  <div className="flex-shrink-0 flex items-center gap-2 rounded-full px-3 sm:px-4 py-1.5 sm:py-2 font-bold text-sm sm:text-base md:text-lg bg-yellow-100/80 text-yellow-800 border border-yellow-300">
+                    <span>⏳</span>
+                    <span>Starting in {countdownBeforeRecord}s</span>
                   </div>
                 )}
               </div>
@@ -1571,31 +1620,27 @@ const Interview = () => {
             {(() => {
               // Si es Video Question, usar controles especiales
               if (isVideoQuestion) {
-                // Estado: Review Mode para video question
+                // Estado: Review Mode para video question (PRIMERA pregunta, no la última)
                 if (isReviewMode && !isTranscribing) {
                   return (
                     <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl -mt-4 sm:-mt-8 relative z-20">
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4">
                         <button
                           type="button"
-                          onClick={handlePreviousQuestion}
-                          className="glass-card bg-white/40 hover:bg-white/60 border border-white/30 rounded-full px-4 sm:px-6 py-2 sm:py-3 font-medium text-gray-700 transition-all hover:scale-105 text-sm sm:text-base"
-                        >
-                          Previous
-                        </button>
-                        <button
-                          type="button"
                           onClick={retakeRecording}
                           className="glass-card bg-white/40 hover:bg-white/60 border border-white/30 text-gray-700 rounded-full px-4 sm:px-6 py-2 sm:py-3 font-semibold transition-all hover:scale-105 text-sm sm:text-base"
                         >
-                          Retake
+                          Retake Recording
                         </button>
                         <button
-                          type="submit"
-                          disabled={submitting || !recordedVideo}
-                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full px-6 sm:px-8 py-2 sm:py-3 font-semibold transition shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                          type="button"
+                          onClick={handleNextQuestion}
+                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full px-6 sm:px-8 py-2 sm:py-3 font-semibold transition shadow-lg hover:shadow-xl text-sm sm:text-base flex items-center gap-2"
                         >
-                          {submitting ? 'Submitting...' : 'Submit Interview'}
+                          <span>Next Question</span>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
                         </button>
                       </div>
                     </div>
@@ -1606,14 +1651,6 @@ const Interview = () => {
                 return (
                   <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl -mt-4 sm:-mt-8 relative z-20">
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-                      <button
-                        type="button"
-                        onClick={handlePreviousQuestion}
-                        className="glass-card bg-white/40 hover:bg-white/60 border border-white/30 rounded-full px-4 sm:px-6 py-2 sm:py-3 font-medium text-gray-700 transition-all hover:scale-105 text-sm sm:text-base w-full sm:w-auto"
-                      >
-                        Previous
-                      </button>
-
                       {/* Hide play button if auto-starting or if already recording */}
                       {!isRecording && !recordedVideo && !shouldAutoStartRecording ? (
                         <button
@@ -1667,8 +1704,25 @@ const Interview = () => {
               }
 
               // Para preguntas de texto (no video question)
-              // Estado: Answer Saved - Solo botón Next
+              // Estado: Answer Saved - Botón Next o Submit según si es la última pregunta
               if (answerSaved && !isReviewMode && !isTranscribing) {
+                // Si es la última pregunta de texto, mostrar botón Submit
+                if (isLastTextQuestion) {
+                  return (
+                    <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl -mt-4 sm:-mt-8 relative z-20">
+                      <div className="flex items-center justify-center">
+                        <button
+                          type="submit"
+                          disabled={submitting}
+                          className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-full px-6 sm:px-8 py-3 sm:py-4 font-bold text-base sm:text-lg shadow-xl hover:shadow-2xl transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {submitting ? 'Submitting...' : 'Submit Interview'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+                // Si no es la última pregunta, mostrar botón Next
                 return (
                   <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl -mt-4 sm:-mt-8 relative z-20">
                     <div className="flex items-center justify-center">
@@ -1689,30 +1743,7 @@ const Interview = () => {
 
               // Estado: Review Mode - Botones Retake y Keep
               if (isReviewMode && !isTranscribing) {
-                // Para la pregunta de video final, mostrar botón de Submit directamente
-                if (isVideoQuestion) {
-                  return (
-                    <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl -mt-4 sm:-mt-8 relative z-20">
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4">
-                        <button
-                          type="button"
-                          onClick={retakeRecording}
-                          className="glass-card bg-white/40 hover:bg-white/60 border border-white/30 text-gray-700 rounded-full px-4 sm:px-6 py-2 sm:py-3 font-semibold transition-all hover:scale-105 text-sm sm:text-base"
-                        >
-                          Retake Recording
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={submitting}
-                          className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-full px-6 sm:px-8 py-2 sm:py-3 font-semibold transition shadow-lg hover:shadow-xl text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {submitting ? 'Submitting...' : 'Submit Interview'}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                }
-                
+                // El video ya se maneja arriba, así que aquí solo manejamos preguntas de texto
                 // Para preguntas de texto, mostrar botón "Keep This Answer"
                 return (
                   <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl -mt-4 sm:-mt-8 relative z-20">

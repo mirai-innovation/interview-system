@@ -15,6 +15,7 @@ const CVUpload = () => {
   const [profile, setProfile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
+  const resultsRef = useRef(null);
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
   const isAdmin = user?.role === 'admin';
@@ -22,6 +23,15 @@ const CVUpload = () => {
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  // Auto-scroll to results when analysis is completed
+  useEffect(() => {
+    if (profile?.cvAnalyzed && resultsRef.current) {
+      setTimeout(() => {
+        resultsRef.current.scrollIntoView({ behavior: 'smooth' });
+      }, 200);
+    }
+  }, [profile?.cvAnalyzed]);
 
   const fetchProfile = async () => {
     try {
@@ -139,6 +149,12 @@ const CVUpload = () => {
       const response = await api.post('/users/analyze-cv');
       setMessage(`CV analyzed successfully. ${response.data.questions?.length || 4} interview questions have been generated.`);
       await fetchProfile();
+      // Scroll to results after analysis completes
+      if (resultsRef.current) {
+        setTimeout(() => {
+          resultsRef.current.scrollIntoView({ behavior: 'smooth' });
+        }, 200);
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Error analyzing CV');
     } finally {
@@ -279,52 +295,7 @@ const CVUpload = () => {
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload CV</h2>
                 <p className="text-gray-600">Upload your CV in PDF format (max 5MB)</p>
               </div>
-              {profile?.cvPath && (
-                <div className="flex items-center gap-2 bg-green-100/80 text-green-700 px-4 py-2 rounded-full text-sm font-semibold">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span>CV Uploaded</span>
-                </div>
-              )}
             </div>
-
-            {profile?.cvPath && (
-              <div className="glass-card bg-blue-50/60 border-blue-200 p-4 mb-6">
-                <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                  <div className="flex-1">
-                    <p className="text-sm text-blue-800 font-medium mb-3">
-                      You already have a CV uploaded. Uploading a new CV will replace the existing one and reset your analysis.
-                    </p>
-                    <button
-                      onClick={handleDeleteCV}
-                      disabled={deleting}
-                      className="border border-red-400 bg-transparent hover:bg-red-50 text-red-500 hover:text-red-600 px-3 py-1.5 rounded-lg text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {deleting ? (
-                        <>
-                          <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Deleting...
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          Delete Current CV
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Drag and Drop Zone */}
             <div
@@ -353,12 +324,13 @@ const CVUpload = () => {
               </div>
 
               {profile?.cvPath ? (
-                <div className="w-full">
-                  <div className="glass-card bg-white/60 border border-green-200/60 p-4 mb-4 inline-block">
+                <div className="w-full space-y-4">
+                  <div className="glass-card bg-white/60 border border-green-200/60 p-4 inline-block w-full">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-3.5l-1-1h-5l-1 1H6a2 2 0 00-2 2z" />
                         </svg>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -367,12 +339,38 @@ const CVUpload = () => {
                         </p>
                         <p className="text-xs text-gray-500">PDF Document</p>
                       </div>
-                      <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
+                      <button
+                        onClick={handleDeleteCV}
+                        disabled={deleting}
+                        className="inline-flex items-center gap-2 border border-red-400 bg-transparent hover:bg-red-50 text-red-500 hover:text-red-600 px-3 py-1.5 rounded-lg text-sm font-medium transition disabled:opacity-50"
+                      >
+                        {deleting ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete CV
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-600">Click to upload a new CV</p>
+
+                  <button
+                    onClick={handleAnalyze}
+                    disabled={uploading || analyzing}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition shadow-md hover:shadow-lg disabled:opacity-50"
+                  >
+                    {analyzing ? 'Analyzing...' : 'Re-analyze CV'}
+                  </button>
                 </div>
               ) : file ? (
                 <div>
@@ -473,6 +471,7 @@ const CVUpload = () => {
         {/* Results Section - Aparece condicionalmente */}
         {profile?.cvAnalyzed && (
           <>
+            <div ref={resultsRef}></div>
             {/* Métricas Bento - Dos tarjetas cuadradas */}
             <div className={`grid grid-cols-1 ${isAdmin ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-6 mb-8`}>
               {isAdmin && (
@@ -557,7 +556,7 @@ const CVUpload = () => {
                     </div>
                     <div>
                       <h3 className="text-2xl font-bold text-gray-700 mb-1">
-                        {profile.questions.length} Interview Questions Generated
+                        Interview Questions Generated
                       </h3>
                       <p className="text-gray-600 text-sm">
                         Your personalized interview questions are ready. Start your interview now!
