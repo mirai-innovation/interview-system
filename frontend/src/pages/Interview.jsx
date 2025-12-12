@@ -482,6 +482,11 @@ const Interview = () => {
         console.log('[TTS] Generando audio con Eleven Labs...');
         const response = await api.post('/users/text-to-speech', { text: questionText });
         
+        // Verificar que la respuesta tenga audio
+        if (!response.data || !response.data.audio) {
+          throw new Error('No audio data received from server');
+        }
+        
         const { audio: base64Audio, mimeType } = response.data;
 
         // Convertir base64 a blob
@@ -525,7 +530,18 @@ const Interview = () => {
         await audio.play();
         console.log('[TTS] Reproduciendo audio de Eleven Labs');
       } catch (error) {
-        console.error('[TTS] Error con Eleven Labs, usando fallback:', error);
+        console.error('[TTS] Error con Eleven Labs:', error);
+        console.error('[TTS] Error details:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status
+        });
+        
+        // Si el error es 500 o no hay API key configurada, usar fallback
+        if (error.response?.status === 500 || error.response?.data?.message?.includes('not configured')) {
+          console.warn('[TTS] Eleven Labs no configurado o error del servidor, usando fallback');
+        }
+        
         // Fallback a speechSynthesis si Eleven Labs no está disponible
         fallbackToSpeechSynthesis(questionText, resolve);
       }
