@@ -335,9 +335,9 @@ const Landing = () => {
               <h4 className="text-lg font-semibold mb-4">Quick Links</h4>
               <ul className="space-y-2 text-gray-400">
                 <li>
-                  <Link to="/" className="hover:text-white transition">
+                  <a href="https://www.mirai-innovation-lab.com/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
                     Home
-                  </Link>
+                  </a>
                 </li>
                 {user && (
                   <>
@@ -354,7 +354,7 @@ const Landing = () => {
                   </>
                 )}
                 <li>
-                  <a href="#" className="hover:text-white transition">
+                  <a href="https://www.mirai-innovation-lab.com/training-programs/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
                     Academic Programs
                   </a>
                 </li>
@@ -364,7 +364,7 @@ const Landing = () => {
               <h4 className="text-lg font-semibold mb-4">Information</h4>
               <ul className="space-y-2 text-gray-400">
                 <li>
-                  <a href="#" className="hover:text-white transition">
+                  <a href="https://www.mirai-innovation-lab.com/about-us/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
                     About the Institute
                   </a>
                 </li>
@@ -374,7 +374,7 @@ const Landing = () => {
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-white transition">
+                  <a href="https://www.mirai-innovation-lab.com/directions-to-mirai-innovation-laboratory/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
                     Contact
                   </a>
                 </li>
