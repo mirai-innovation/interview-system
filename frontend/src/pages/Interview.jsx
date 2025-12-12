@@ -1695,7 +1695,7 @@ const Interview = () => {
                       {isRecording && (
                         <div className="text-center">
                           <div className="flex flex-col items-center gap-1">
-                            <p className="text-xs text-gray-500 font-medium">Tiempo restante / Remaining time</p>
+                            <p className="text-xs text-gray-500 font-medium">Remaining time</p>
                             <div className={`flex items-center gap-2 rounded-full px-4 sm:px-6 py-2 sm:py-3 font-bold text-lg sm:text-2xl md:text-3xl ${
                               (60 - recordingTime) <= 10
                                 ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/50' 

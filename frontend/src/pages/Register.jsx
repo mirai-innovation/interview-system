@@ -132,9 +132,9 @@ const Register = () => {
               required
             >
               <option value="">Select...</option>
-              <option value="Masculino">Male</option>
-              <option value="Femenino">Female</option>
-              <option value="Otro">Other</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
             </select>
           </div>
 

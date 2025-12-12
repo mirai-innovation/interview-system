@@ -562,7 +562,7 @@ const AdminPanel = () => {
                               className="w-full rounded-xl shadow-lg"
                               src={getVideoUrl(userDetails.interviewVideo)}
                             >
-                              Tu navegador no soporta la reproducción de video.
+                              Your browser does not support video playback.
                             </video>
                           </div>
                         )}
