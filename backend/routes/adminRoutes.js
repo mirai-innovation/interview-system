@@ -178,6 +178,7 @@ router.delete("/users/:userId/cv", async (req, res) => {
     user.interviewScore = undefined;
     user.interviewAnalysis = [];
     user.interviewVideo = undefined;
+    user.interviewVideoTranscription = undefined;
     user.interviewCompleted = false;
 
     await user.save();
@@ -201,6 +202,7 @@ router.delete("/users/:userId/interview", async (req, res) => {
     user.interviewScore = undefined;
     user.interviewAnalysis = [];
     user.interviewVideo = undefined;
+    user.interviewVideoTranscription = undefined;
     user.interviewCompleted = false;
 
     await user.save();

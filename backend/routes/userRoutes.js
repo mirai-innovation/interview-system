@@ -561,7 +561,7 @@ router.post("/submit-interview", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const { answers, s3VideoUrl: bodyS3VideoUrl } = req.body;
+    const { answers, s3VideoUrl: bodyS3VideoUrl, videoTranscription } = req.body;
     
     // Check if we have an S3 URL (direct upload) or need to process file upload
     if (bodyS3VideoUrl) {
@@ -579,7 +579,7 @@ router.post("/submit-interview", authMiddleware, async (req, res) => {
           videoFile = req.files?.find(f => f.fieldname === 'video') || null;
           
           try {
-            await processSubmitInterview(req, res, videoFile, null);
+            await processSubmitInterview(req, res, videoFile, null, req.body.videoTranscription);
             resolve();
           } catch (error) {
             reject(error);
@@ -589,14 +589,14 @@ router.post("/submit-interview", authMiddleware, async (req, res) => {
     }
     
     // Process with S3 URL
-    await processSubmitInterview(req, res, null, s3VideoUrl);
+    await processSubmitInterview(req, res, null, s3VideoUrl, videoTranscription);
   } catch (error) {
     return res.status(500).json({ message: error.message || "Internal server error" });
   }
 });
 
 // Helper function to process interview submission
-async function processSubmitInterview(req, res, videoFile, s3VideoUrl) {
+async function processSubmitInterview(req, res, videoFile, s3VideoUrl, videoTranscription = null) {
   try {
     const user = await User.findById(req.userId);
     if (!user) {
@@ -647,6 +647,10 @@ async function processSubmitInterview(req, res, videoFile, s3VideoUrl) {
     if (s3VideoUrl) {
       // Video was uploaded directly to S3
       user.interviewVideo = s3VideoUrl;
+      // Save video transcription if provided
+      if (videoTranscription) {
+        user.interviewVideoTranscription = videoTranscription;
+      }
     } else if (videoFile) {
       // Video was uploaded traditionally
       let videoPath;
@@ -823,6 +827,7 @@ router.get("/interview-responses", authMiddleware, async (req, res) => {
       questions: allQuestions,
       responses: user.interviewResponses || [],
       video: user.interviewVideo || null,
+      videoTranscription: user.interviewVideoTranscription || null,
       analysis: user.interviewAnalysis || []
     };
 

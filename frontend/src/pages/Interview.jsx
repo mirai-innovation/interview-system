@@ -35,6 +35,7 @@ const Interview = () => {
   const [videoBlobType, setVideoBlobType] = useState(null); // Store the MIME type of the video blob
   const [recordingTime, setRecordingTime] = useState(0);
   const [transcribedText, setTranscribedText] = useState('');
+  const [videoPresentationTranscription, setVideoPresentationTranscription] = useState(''); // Transcription for video presentation
   const [isReviewMode, setIsReviewMode] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [answerSaved, setAnswerSaved] = useState(false); // Track if answer was saved
@@ -185,20 +186,54 @@ const Interview = () => {
           }
           setAnswers(savedAnswers);
           
-          // Cargar video si existe (índice 0)
-          if (response.data.interviewVideo) {
-            const videoAnswersArray = [response.data.interviewVideo];
-            setVideoAnswers(videoAnswersArray);
-            // Si el video es una URL (string), establecerlo como recordedVideo para mostrarlo
-            if (typeof response.data.interviewVideo === 'string') {
-              setRecordedVideo(response.data.interviewVideo);
-              setIsReviewMode(true); // Mostrar en modo review si ya está guardado
+            // Cargar video si existe (índice 0)
+            if (response.data.interviewVideo) {
+              const videoAnswersArray = [response.data.interviewVideo];
+              setVideoAnswers(videoAnswersArray);
+              // Si el video es una URL (string), establecerlo como recordedVideo para mostrarlo
+              if (typeof response.data.interviewVideo === 'string') {
+                setRecordedVideo(response.data.interviewVideo);
+                setIsReviewMode(true); // Mostrar en modo review si ya está guardado
+              }
+              // Cargar transcripción del video si existe
+              if (response.data.interviewVideoTranscription) {
+                setVideoPresentationTranscription(response.data.interviewVideoTranscription);
+              }
             }
+          
+          // Encontrar la primera pregunta sin respuesta para continuar desde ahí
+          // Las respuestas guardadas (interviewResponses) solo contienen respuestas de texto
+          // El video se guarda por separado en interviewVideo
+          let startIndex = 0;
+          
+          // Verificar si el video está guardado
+          const hasVideo = response.data.interviewVideo;
+          
+          if (hasVideo) {
+            // Video está guardado, buscar primera pregunta de texto sin respuesta
+            // savedAnswers[0] corresponde a la primera pregunta de texto (índice 1 en currentQuestionIndex)
+            // savedAnswers[1] corresponde a la segunda pregunta de texto (índice 2 en currentQuestionIndex)
+            // etc.
+            let foundUnanswered = false;
+            for (let i = 0; i < savedAnswers.length; i++) {
+              if (!savedAnswers[i] || savedAnswers[i].trim() === '') {
+                // Primera pregunta sin respuesta encontrada
+                // savedAnswers[i] corresponde a currentQuestionIndex = i + 1
+                startIndex = i + 1;
+                foundUnanswered = true;
+                break;
+              }
+            }
+            // Si todas las respuestas están completas, ir a la última pregunta
+            if (!foundUnanswered && savedAnswers.every(a => a && a.trim() !== '')) {
+              startIndex = combinedQuestions.length; // Última pregunta
+            }
+          } else {
+            // Video no está guardado, empezar desde el video (índice 0)
+            startIndex = 0;
           }
           
-          // SIEMPRE empezar con video (índice 0) - sin importar si está guardado o no
-          // El usuario debe ver el video primero siempre
-          setCurrentQuestionIndex(0);
+          setCurrentQuestionIndex(startIndex);
         } else {
           setAnswers(new Array(combinedQuestions.length).fill(''));
           setCurrentQuestionIndex(0); // Empezar con video (índice 0)
@@ -800,11 +835,23 @@ const Interview = () => {
     // REQUERIMIENTO 3.1: Cancelar cualquier TTS que pudiera estar activo
     cancelTTS();
     
-    // Para pregunta de video, ir directamente a review mode
+    // Para pregunta de video, también transcribir
     if (isVideoQuestion) {
-      setIsReviewMode(true);
-      setVoiceState('REVIEW_MODE');
-      return;
+      // Iniciar transcripción para video de presentación
+      const timeoutId = setTimeout(() => {
+        if (videoBlob && 
+            !isRecording && 
+            !isTranscribing && 
+            !isReviewMode && 
+            !answerSaved && 
+            currentQuestionIndex === 0) {
+          transcribeVideo();
+        }
+      }, 200);
+      
+      return () => {
+        clearTimeout(timeoutId);
+      };
     }
     
     // Para preguntas de texto, iniciar transcripción
@@ -1107,8 +1154,14 @@ const Interview = () => {
           setIsReviewMode(true);
           setVoiceState('REVIEW_MODE');
         } else {
-          setTranscribedText(transcription);
-          handleAnswerChange(transcription);
+          // Si es video de presentación (índice 0), guardar transcripción por separado
+          if (currentQuestionIndex === 0) {
+            setVideoPresentationTranscription(transcription);
+          } else {
+            // Para preguntas de texto, usar el flujo normal
+            setTranscribedText(transcription);
+            handleAnswerChange(transcription);
+          }
         }
         
         setMessage('');
@@ -1298,7 +1351,8 @@ const Interview = () => {
         // Use JSON if video is in S3
         requestBody = {
           answers: textAnswers,
-          s3VideoUrl: s3VideoUrl
+          s3VideoUrl: s3VideoUrl,
+          videoTranscription: videoPresentationTranscription || null
         };
         headers['Content-Type'] = 'application/json';
       } else {
@@ -1626,20 +1680,20 @@ const Interview = () => {
 
             {/* Video Container (The Lens) - Renderizado Condicional Estricto */}
             {/* Ocultar cámara durante transcripción - solo mostrar mensaje de transcripción */}
-            {!isTranscribing && !answerSaved && (
+            {/* Mostrar video grabado si está en review mode para video question */}
+            {isReviewMode && isVideoQuestion && recordedVideo && !isTranscribing && !answerSaved ? (
+              <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border-2 sm:border-4 border-white/20" style={{ aspectRatio: '16/9' }}>
+                {recordedVideo && (
+                  <video
+                    src={recordedVideo}
+                    controls
+                    className="w-full h-full object-contain bg-black"
+                  />
+                )}
+              </div>
+            ) : !isTranscribing && !answerSaved && !(isVideoQuestion && isReviewMode && recordedVideo) ? (
               <>
-                {isReviewMode && isVideoQuestion ? (
-                  /* Estado: Review - Solo muestra el video grabado para la primera pregunta (video) */
-                  <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border-2 sm:border-4 border-white/20" style={{ aspectRatio: '16/9' }}>
-                    {recordedVideo && (
-                      <video
-                        src={recordedVideo}
-                        controls
-                        className="w-full h-full object-contain bg-black"
-                      />
-                    )}
-                  </div>
-                ) : !isReviewMode ? (
+                {!isReviewMode && isVideoQuestion ? (
                   /* Estado: Recording/Idle - Solo muestra la cámara */
                   <div className={`relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl transition-all duration-300 ${
                     isRecording 
@@ -1938,6 +1992,20 @@ const Interview = () => {
                       ? 'Recording Complete! Review your video above. You can proceed to submit the interview.'
                       : 'Recording Complete! Review and edit your transcribed answer below.'}
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* Video Presentation Transcription - Mostrar cuando está en review mode para video question */}
+            {isReviewMode && !isTranscribing && isVideoQuestion && videoPresentationTranscription && (
+              <div className="glass-card bg-white/60 backdrop-blur-md border border-white/40 rounded-2xl p-4 sm:p-6 mb-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-2 sm:mb-3">
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700">
+                    Video Presentation Transcription:
+                  </label>
+                </div>
+                <div className="glass-card bg-white/80 backdrop-blur-sm border border-white/40 rounded-xl w-full py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-base text-gray-800 leading-relaxed">
+                  {videoPresentationTranscription}
                 </div>
               </div>
             )}

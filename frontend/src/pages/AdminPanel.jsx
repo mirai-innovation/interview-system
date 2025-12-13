@@ -575,10 +575,10 @@ const AdminPanel = () => {
                           </span>
                         </div>
 
-                        {/* Video Final con Marco de Cristal */}
+                        {/* Video de Presentación con Marco de Cristal */}
                         {userDetails.interviewVideo && (
                           <div className="glass-card bg-white/40 border border-white/40 p-4 rounded-2xl">
-                            <p className="text-sm font-semibold text-gray-700 mb-3">Final Video</p>
+                            <p className="text-sm font-semibold text-gray-700 mb-3">Presentation Video</p>
                             <video
                               controls
                               className="w-full rounded-xl shadow-lg"
@@ -586,6 +586,14 @@ const AdminPanel = () => {
                             >
                               Your browser does not support video playback.
                             </video>
+                            {userDetails.interviewVideoTranscription && (
+                              <div className="mt-4 pt-4 border-t border-white/20">
+                                <p className="text-xs font-semibold text-gray-600 mb-2">Transcription:</p>
+                                <p className="text-sm text-gray-700 bg-white/40 p-3 rounded-lg">
+                                  {userDetails.interviewVideoTranscription}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         )}
 

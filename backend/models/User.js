@@ -28,6 +28,7 @@ const userSchema = new mongoose.Schema(
     // Entrevista
     interviewResponses: [{ type: String }],
     interviewVideo: { type: String }, // Video file path
+    interviewVideoTranscription: { type: String }, // Transcription of the presentation video
     interviewScore: { type: Number },
     interviewAnalysis: [{ 
       score: { type: Number },
