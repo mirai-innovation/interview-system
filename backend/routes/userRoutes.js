@@ -711,7 +711,7 @@ router.post("/save-interview-progress", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const { answers, currentQuestionIndex } = req.body;
+    const { answers, currentQuestionIndex, s3VideoUrl, videoTranscription } = req.body;
 
     // Don't save if interview is already completed
     if (user.interviewCompleted) {
@@ -720,6 +720,14 @@ router.post("/save-interview-progress", authMiddleware, async (req, res) => {
 
     // Save answers temporarily (don't mark as completed)
     user.interviewResponses = answers || [];
+    
+    // Save video if provided (for presentation video)
+    if (s3VideoUrl) {
+      user.interviewVideo = s3VideoUrl;
+      if (videoTranscription) {
+        user.interviewVideoTranscription = videoTranscription;
+      }
+    }
     
     await user.save();
 

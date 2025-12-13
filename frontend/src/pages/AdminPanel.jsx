@@ -620,82 +620,54 @@ const AdminPanel = () => {
                         )}
 
                         {/* Preguntas y Respuestas */}
-                        {userDetails.questions && userDetails.questions.length > 0 && (
-                          <div>
-                            <p className="text-sm font-semibold text-gray-700 mb-4">Questions and Answers</p>
-                            <div className="space-y-4">
-                              {userDetails.questions.map((question, idx) => (
-                                <div key={idx} className="glass-card bg-white/40 border border-white/40 p-4 rounded-xl">
-                                  <p className="font-semibold text-gray-900 mb-2">
-                                    {question}
-                                  </p>
-                                  <p className="text-gray-700 text-sm mb-3">
-                                    {userDetails.interviewResponses && userDetails.interviewResponses[idx] ? (
-                                      userDetails.interviewResponses[idx]
-                                    ) : (
-                                      <span className="text-gray-400">No answer</span>
-                                    )}
-                                  </p>
-                                  {userDetails.interviewAnalysis && userDetails.interviewAnalysis[idx] && (
-                                    <div className="mt-3 pt-3 border-t border-white/20">
-                                      <div className="flex items-center justify-between mb-2">
-                                        <span className="text-xs text-gray-600">Score</span>
-                                        <span className="text-lg font-bold text-blue-600">
-                                          {userDetails.interviewAnalysis[idx].score}/100
-                                        </span>
-                                      </div>
-                                      <p className="text-xs text-gray-600">
-                                        {userDetails.interviewAnalysis[idx].explanation}
-                                      </p>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Preguntas por defecto */}
-                        {userDetails.interviewResponses && userDetails.interviewResponses.length > (userDetails.questions?.length || 0) && (
-                          <div>
-                            <p className="text-sm font-semibold text-gray-700 mb-4">Additional Questions</p>
-                            <div className="space-y-4">
-                              {userDetails.interviewResponses.slice(userDetails.questions?.length || 0).map((answer, idx) => {
-                                const defaultQuestions = [
-                                  "What is your motivation for applying to this program and joining Mirai Innovation Research Institute?",
-                                  "What is your plan to finance your tuition, travel expenses, and accommodation during your stay in Japan?"
-                                ];
-                                const questionIndex = (userDetails.questions?.length || 0) + idx;
-                                const question = defaultQuestions[idx] || `Question ${questionIndex + 1}`;
-                                const analysisIndex = questionIndex;
-                                
-                                return (
-                                  <div key={questionIndex} className="glass-card bg-white/40 border border-white/40 p-4 rounded-xl">
+                        {(() => {
+                          // Combine all questions (generated + default) to match interviewResponses structure
+                          const defaultQuestions = [
+                            "What is your motivation for applying to this program and joining Mirai Innovation Research Institute?",
+                            "What is your plan to finance your tuition, travel expenses, and accommodation during your stay in Japan?"
+                          ];
+                          const generatedQuestions = userDetails.questions || [];
+                          const allQuestions = [...generatedQuestions, ...defaultQuestions];
+                          const responses = userDetails.interviewResponses || [];
+                          
+                          // Ensure we have matching arrays
+                          const questionsToShow = allQuestions.slice(0, responses.length);
+                          
+                          return questionsToShow.length > 0 && (
+                            <div>
+                              <p className="text-sm font-semibold text-gray-700 mb-4">Questions and Answers</p>
+                              <div className="space-y-4">
+                                {questionsToShow.map((question, idx) => (
+                                  <div key={idx} className="glass-card bg-white/40 border border-white/40 p-4 rounded-xl">
                                     <p className="font-semibold text-gray-900 mb-2">
                                       {question}
                                     </p>
                                     <p className="text-gray-700 text-sm mb-3">
-                                      {answer || <span className="text-gray-400">No answer</span>}
+                                      {responses[idx] && responses[idx].trim() !== '' ? (
+                                        responses[idx]
+                                      ) : (
+                                        <span className="text-gray-400">No answer</span>
+                                      )}
                                     </p>
-                                    {userDetails.interviewAnalysis && userDetails.interviewAnalysis[analysisIndex] && (
+                                    {userDetails.interviewAnalysis && userDetails.interviewAnalysis[idx] && (
                                       <div className="mt-3 pt-3 border-t border-white/20">
                                         <div className="flex items-center justify-between mb-2">
                                           <span className="text-xs text-gray-600">Score</span>
                                           <span className="text-lg font-bold text-blue-600">
-                                            {userDetails.interviewAnalysis[analysisIndex].score}/100
+                                            {userDetails.interviewAnalysis[idx].score}/100
                                           </span>
                                         </div>
                                         <p className="text-xs text-gray-600">
-                                          {userDetails.interviewAnalysis[analysisIndex].explanation}
+                                          {userDetails.interviewAnalysis[idx].explanation}
                                         </p>
                                       </div>
                                     )}
                                   </div>
-                                );
-                              })}
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                         
                         {/* Delete Interview Button */}
                         <div className="mt-6 pt-6 border-t border-white/20">

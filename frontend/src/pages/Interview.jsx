@@ -460,7 +460,7 @@ const Interview = () => {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  // Helper para formatear el tiempo restante de grabación (1 minuto máximo)
+  // Helper to format remaining recording time (1 minute maximum)
   const formatRecordingTimeRemaining = (elapsedSeconds) => {
     const remaining = Math.max(0, 60 - elapsedSeconds); // Asegurar que no sea negativo
     const mins = Math.floor(remaining / 60);
@@ -1185,6 +1185,20 @@ const Interview = () => {
           // Si es video de presentación (índice 0), guardar transcripción por separado
           if (currentQuestionIndex === 0) {
             setVideoPresentationTranscription(transcription);
+            // Guardar el video en el progreso después de transcribirlo
+            if (publicUrl) {
+              try {
+                await api.post('/users/save-interview-progress', {
+                  answers: answers.slice(0, allQuestions.length),
+                  currentQuestionIndex: currentQuestionIndex,
+                  s3VideoUrl: publicUrl,
+                  videoTranscription: transcription
+                });
+                console.log('[SAVE PROGRESS] Video de presentación guardado en progreso');
+              } catch (saveError) {
+                console.error('[SAVE PROGRESS] Error guardando video:', saveError);
+              }
+            }
           } else {
             // Para preguntas de texto, usar el flujo normal
             setTranscribedText(transcription);
@@ -2032,7 +2046,7 @@ const Interview = () => {
                     {isRecording && (
                       <div className="mt-4 text-center">
                         <div className="flex flex-col items-center gap-1">
-                          <p className="text-xs text-gray-500 font-medium">Tiempo restante / Remaining time</p>
+                          <p className="text-xs text-gray-500 font-medium">Remaining time</p>
                           <div className={`flex items-center gap-2 rounded-full px-4 sm:px-6 py-2 sm:py-3 font-bold text-lg sm:text-2xl md:text-3xl ${
                             (60 - recordingTime) <= 10
                               ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/50' 
