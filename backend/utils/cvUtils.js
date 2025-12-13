@@ -218,10 +218,10 @@ Skills found in the CV:
 ${skills.join(", ")}
 
 Respond ONLY in the following format, without adding anything else:
-1. Question about hard skill
-2. Question about hard skill
-3. Question about soft skill
-4. Question about soft skill
+Question about hard skill
+Question about hard skill
+Question about soft skill
+Question about soft skill
 `;
 
     const response = await openai.chat.completions.create({

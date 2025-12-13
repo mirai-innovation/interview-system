@@ -63,12 +63,14 @@ const CircularProgress = ({ percentage, size = 150, color = 'blue' }) => {
 
 const Results = () => {
   const [profile, setProfile] = useState(null);
+  const [interviewData, setInterviewData] = useState(null);
   const [loading, setLoading] = useState(true);
   const { user } = useContext(AuthContext);
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     fetchProfile();
+    fetchInterviewData();
   }, []);
 
   const fetchProfile = async () => {
@@ -78,6 +80,15 @@ const Results = () => {
     } catch (error) {
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchInterviewData = async () => {
+    try {
+      const response = await api.get('/users/interview-responses');
+      setInterviewData(response.data);
+    } catch (error) {
+      // Interview not completed yet, that's okay
     }
   };
 
@@ -332,8 +343,45 @@ const Results = () => {
                   </div>
                 </div>
 
+                {/* Questions and Answers */}
+                {interviewData && interviewData.questions && interviewData.responses && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Questions and Answers</h3>
+                    <div className="space-y-4">
+                      {interviewData.questions.map((question, index) => (
+                        <div key={index} className="bg-gray-50 p-4 rounded-lg border-l-4 border-blue-500">
+                          <p className="font-semibold text-gray-900 mb-2">
+                            {question}
+                          </p>
+                          <p className="text-sm text-gray-700 mb-3">
+                            {interviewData.responses[index] || <span className="text-gray-400">No answer</span>}
+                          </p>
+                          {interviewData.analysis && interviewData.analysis[index] && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              {typeof interviewData.analysis[index] === 'string' ? (
+                                <p className="text-xs text-gray-600">{interviewData.analysis[index]}</p>
+                              ) : (
+                                <div className="space-y-1">
+                                  {interviewData.analysis[index].explanation && (
+                                    <p className="text-xs text-gray-600">{interviewData.analysis[index].explanation}</p>
+                                  )}
+                                  {isAdmin && interviewData.analysis[index].score !== undefined && (
+                                    <p className="text-xs text-gray-500 font-medium">
+                                      Score: {interviewData.analysis[index].score}%
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Interview Analysis */}
-                {interviewAnalysis.length > 0 && (
+                {interviewAnalysis.length > 0 && !interviewData && (
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-3">Detailed Analysis</h3>
                     <div className="space-y-3">

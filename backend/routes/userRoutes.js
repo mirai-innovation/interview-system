@@ -621,8 +621,8 @@ async function processSubmitInterview(req, res, videoFile, s3VideoUrl) {
 
     // Default questions
     const defaultQuestions = [
-      "What is your motivation for wanting to come to Mirai Innovation Research Institute?",
-      "How do you plan to finance your stay and the program in Japan?"
+      "What is your motivation for applying to this program and joining Mirai Innovation Research Institute?",
+      "What is your plan to finance your tuition, travel expenses, and accommodation during your stay in Japan?"
     ];
 
     const generatedQuestions = user.questions || [];
@@ -812,8 +812,8 @@ router.get("/interview-responses", authMiddleware, async (req, res) => {
 
     // Default questions
     const defaultQuestions = [
-      "What is your motivation for wanting to come to Mirai Innovation Research Institute?",
-      "How do you plan to finance your stay and the program in Japan?"
+      "What is your motivation for applying to this program and joining Mirai Innovation Research Institute?",
+      "What is your plan to finance your tuition, travel expenses, and accommodation during your stay in Japan?"
     ];
 
     const allQuestions = [...(user.questions || []), ...defaultQuestions];

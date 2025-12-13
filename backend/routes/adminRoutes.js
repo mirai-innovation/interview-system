@@ -156,5 +156,60 @@ router.patch("/users/:userId/toggle-status", async (req, res) => {
   }
 });
 
+// Eliminar CV de usuario
+router.delete("/users/:userId/cv", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    // Limpiar datos del CV
+    user.cvPath = undefined;
+    user.cvText = undefined;
+    user.analysis = undefined;
+    user.skills = [];
+    user.questions = [];
+    user.score = undefined;
+    user.cvAnalyzed = false;
+    
+    // También limpiar datos de entrevista relacionados
+    user.interviewResponses = [];
+    user.interviewScore = undefined;
+    user.interviewAnalysis = [];
+    user.interviewVideo = undefined;
+    user.interviewCompleted = false;
+
+    await user.save();
+
+    res.json({ message: "CV y datos relacionados eliminados exitosamente" });
+  } catch (error) {
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
+// Eliminar entrevista de usuario
+router.delete("/users/:userId/interview", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    // Limpiar datos de entrevista
+    user.interviewResponses = [];
+    user.interviewScore = undefined;
+    user.interviewAnalysis = [];
+    user.interviewVideo = undefined;
+    user.interviewCompleted = false;
+
+    await user.save();
+
+    res.json({ message: "Entrevista eliminada exitosamente" });
+  } catch (error) {
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
 export default router;
 

@@ -62,8 +62,8 @@ const Interview = () => {
 
   // Default questions
   const defaultQuestions = [
-    "What is your motivation for wanting to come to Mirai Innovation Research Institute?",
-    "How do you plan to finance your stay and the program in Japan?"
+    "What is your motivation for applying to this program and joining Mirai Innovation Research Institute?",
+    "What is your plan to finance your tuition, travel expenses, and accommodation during your stay in Japan?"
   ];
 
   useEffect(() => {
@@ -271,8 +271,8 @@ const Interview = () => {
       
       // REQUERIMIENTO 2.3: Esperar estrictamente a onAudioEnd
       readQuestionAloud(videoQuestion).then(() => {
-        // REQUERIMIENTO 2.4: Pausa de 5s visible antes de grabar
-        setCountdownBeforeRecord(5);
+        // REQUERIMIENTO 2.4: Pausa de 10s visible antes de grabar
+        setCountdownBeforeRecord(10);
         if (countdownIntervalRef.current) {
           clearInterval(countdownIntervalRef.current);
         }
@@ -943,8 +943,8 @@ const Interview = () => {
           
           // REQUERIMIENTO 2.3: Esperar estrictamente a onAudioEnd
           readQuestionAloud(videoQuestion).then(() => {
-            // REQUERIMIENTO 2.4: Pausa de 5s visible antes de grabar
-            setCountdownBeforeRecord(5);
+            // REQUERIMIENTO 2.4: Pausa de 10s visible antes de grabar
+            setCountdownBeforeRecord(10);
             if (countdownIntervalRef.current) {
               clearInterval(countdownIntervalRef.current);
             }
@@ -970,8 +970,8 @@ const Interview = () => {
         if (currentQuestion) {
           // REQUERIMIENTO 2.3: Esperar estrictamente a onAudioEnd
           readQuestionAloud(currentQuestion).then(() => {
-            // REQUERIMIENTO 2.4: Pausa de 5s visible antes de grabar
-            setCountdownBeforeRecord(5);
+            // REQUERIMIENTO 2.4: Pausa de 10s visible antes de grabar
+            setCountdownBeforeRecord(10);
             if (countdownIntervalRef.current) {
               clearInterval(countdownIntervalRef.current);
             }

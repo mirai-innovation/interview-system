@@ -518,17 +518,39 @@ const AdminPanel = () => {
                               </div>
                             </div>
                           )}
-                          <a
-                            href={getCVUrl(userDetails.cvPath)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            View/Download CV
-                          </a>
+                          <div className="flex gap-3">
+                            <a
+                              href={getCVUrl(userDetails.cvPath)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              View/Download CV
+                            </a>
+                            <button
+                              onClick={async () => {
+                                if (!window.confirm('Are you sure you want to delete the CV and related data? This will also reset the interview data.')) {
+                                  return;
+                                }
+                                try {
+                                  await api.delete(`/admin/users/${selectedUser}/cv`);
+                                  await fetchUserDetails(selectedUser);
+                                  alert('CV deleted successfully');
+                                } catch (error) {
+                                  alert('Error deleting CV');
+                                }
+                              }}
+                              className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete CV
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <p className="text-gray-500 text-sm">No CV uploaded</p>
@@ -610,8 +632,8 @@ const AdminPanel = () => {
                             <div className="space-y-4">
                               {userDetails.interviewResponses.slice(userDetails.questions?.length || 0).map((answer, idx) => {
                                 const defaultQuestions = [
-                                  "What is your motivation for wanting to come to Mirai Innovation Research Institute?",
-                                  "How do you plan to finance your stay and the program in Japan?"
+                                  "What is your motivation for applying to this program and joining Mirai Innovation Research Institute?",
+                                  "What is your plan to finance your tuition, travel expenses, and accommodation during your stay in Japan?"
                                 ];
                                 const questionIndex = (userDetails.questions?.length || 0) + idx;
                                 const question = defaultQuestions[idx] || `Question ${questionIndex + 1}`;
@@ -644,6 +666,30 @@ const AdminPanel = () => {
                             </div>
                           </div>
                         )}
+                        
+                        {/* Delete Interview Button */}
+                        <div className="mt-6 pt-6 border-t border-white/20">
+                          <button
+                            onClick={async () => {
+                              if (!window.confirm('Are you sure you want to delete the interview data? This will allow the user to retake the interview.')) {
+                                return;
+                              }
+                              try {
+                                await api.delete(`/admin/users/${selectedUser}/interview`);
+                                await fetchUserDetails(selectedUser);
+                                alert('Interview deleted successfully');
+                              } catch (error) {
+                                alert('Error deleting interview');
+                              }
+                            }}
+                            className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete Interview
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
