@@ -1745,9 +1745,9 @@ const Interview = () => {
 
             {/* Video Container (The Lens) - Renderizado Condicional Estricto */}
             {/* Ocultar cámara durante transcripción - solo mostrar mensaje de transcripción */}
-            {/* Ocultar cámara cuando ya se transcribe el video de presentación */}
+            {/* Ocultar cámara cuando ya se transcribe (para todas las preguntas) */}
             {/* Mostrar video grabado si está en review mode para video question */}
-            {!isTranscribing && !answerSaved && !(isReviewMode && isVideoQuestion && videoPresentationTranscription) && (
+            {!isTranscribing && !answerSaved && !(isReviewMode && ((isVideoQuestion && videoPresentationTranscription) || (!isVideoQuestion && transcribedText))) && (
               <>
                 {isReviewMode && isVideoQuestion && recordedVideo ? (
                   /* Estado: Review - Solo muestra el video grabado para la primera pregunta (video) */

@@ -147,57 +147,25 @@ const Results = () => {
 
             {profile?.cvAnalyzed ? (
               <div className="space-y-6">
-                {/* Score Display */}
-                <div className="flex flex-col sm:flex-row items-center gap-6">
-                  <div className="flex-shrink-0">
-                    {isAdmin ? (
+                {/* Score Display - Solo mostrar si es admin */}
+                {isAdmin && (
+                  <div className="flex flex-col sm:flex-row items-center gap-6">
+                    <div className="flex-shrink-0">
                       <CircularProgress percentage={cvScore} size={150} color="blue" />
-                    ) : (
-                      <div className="relative" style={{ width: 150, height: 150 }}>
-                        <svg width={150} height={150} className="transform -rotate-90">
-                          <circle
-                            cx={75}
-                            cy={75}
-                            r={65}
-                            stroke="rgba(255, 255, 255, 0.2)"
-                            strokeWidth="12"
-                            fill="none"
-                          />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="text-center">
-                            <span className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                              —
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 space-y-3">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-600">Overall Score</span>
-                        {isAdmin ? (
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-600">Overall Score</span>
                           <span className="text-2xl font-bold text-blue-600">{cvScore}%</span>
-                        ) : (
-                          <span className="text-2xl font-bold text-gray-400">—</span>
-                        )}
-                      </div>
-                      {isAdmin ? (
+                        </div>
                         <div className="w-full bg-gray-200 rounded-full h-3">
                           <div 
                             className="bg-gradient-to-r from-blue-600 to-purple-600 h-3 rounded-full transition-all duration-1000"
                             style={{ width: `${cvScore}%` }}
                           ></div>
                         </div>
-                      ) : (
-                        <div className="w-full bg-gray-200 rounded-full h-3">
-                          <div className="bg-gray-300 h-3 rounded-full"></div>
-                        </div>
-                      )}
-                    </div>
-                    {isAdmin && (
+                      </div>
                       <div className="flex items-center gap-2">
                         <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
                           cvScore >= 80 ? 'bg-green-100 text-green-700' :
@@ -207,9 +175,9 @@ const Results = () => {
                           {cvScore >= 80 ? 'Excellent' : cvScore >= 60 ? 'Good' : 'Needs Improvement'}
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Skills Section */}
                 {skills.length > 0 && (
@@ -279,57 +247,25 @@ const Results = () => {
 
             {profile?.interviewCompleted ? (
               <div className="space-y-6">
-                {/* Score Display */}
-                <div className="flex flex-col sm:flex-row items-center gap-6">
-                  <div className="flex-shrink-0">
-                    {isAdmin ? (
+                {/* Score Display - Solo mostrar si es admin */}
+                {isAdmin && (
+                  <div className="flex flex-col sm:flex-row items-center gap-6">
+                    <div className="flex-shrink-0">
                       <CircularProgress percentage={interviewScore} size={150} color="green" />
-                    ) : (
-                      <div className="relative" style={{ width: 150, height: 150 }}>
-                        <svg width={150} height={150} className="transform -rotate-90">
-                          <circle
-                            cx={75}
-                            cy={75}
-                            r={65}
-                            stroke="rgba(255, 255, 255, 0.2)"
-                            strokeWidth="12"
-                            fill="none"
-                          />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="text-center">
-                            <span className="text-4xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
-                              —
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 space-y-3">
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-600">Overall Score</span>
-                        {isAdmin ? (
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-600">Overall Score</span>
                           <span className="text-2xl font-bold text-green-600">{interviewScore}%</span>
-                        ) : (
-                          <span className="text-2xl font-bold text-gray-400">—</span>
-                        )}
-                      </div>
-                      {isAdmin ? (
+                        </div>
                         <div className="w-full bg-gray-200 rounded-full h-3">
                           <div 
                             className="bg-gradient-to-r from-green-600 to-blue-600 h-3 rounded-full transition-all duration-1000"
                             style={{ width: `${interviewScore}%` }}
                           ></div>
                         </div>
-                      ) : (
-                        <div className="w-full bg-gray-200 rounded-full h-3">
-                          <div className="bg-gray-300 h-3 rounded-full"></div>
-                        </div>
-                      )}
-                    </div>
-                    {isAdmin && (
+                      </div>
                       <div className="flex items-center gap-2">
                         <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
                           interviewScore >= 80 ? 'bg-green-100 text-green-700' :
@@ -339,9 +275,9 @@ const Results = () => {
                           {interviewScore >= 80 ? 'Excellent' : interviewScore >= 60 ? 'Good' : 'Needs Improvement'}
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Questions and Answers */}
                 {interviewData && interviewData.questions && interviewData.responses && (
