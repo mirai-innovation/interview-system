@@ -1681,20 +1681,66 @@ const Interview = () => {
             {/* Video Container (The Lens) - Renderizado Condicional Estricto */}
             {/* Ocultar cámara durante transcripción - solo mostrar mensaje de transcripción */}
             {/* Mostrar video grabado si está en review mode para video question */}
-            {isReviewMode && isVideoQuestion && recordedVideo && !isTranscribing && !answerSaved ? (
-              <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border-2 sm:border-4 border-white/20" style={{ aspectRatio: '16/9' }}>
-                {recordedVideo && (
-                  <video
-                    src={recordedVideo}
-                    controls
-                    className="w-full h-full object-contain bg-black"
-                  />
-                )}
-              </div>
-            ) : !isTranscribing && !answerSaved && !(isVideoQuestion && isReviewMode && recordedVideo) ? (
+            {!isTranscribing && !answerSaved && (
               <>
-                {!isReviewMode && isVideoQuestion ? (
+                {isReviewMode && isVideoQuestion && recordedVideo ? (
+                  /* Estado: Review - Solo muestra el video grabado para la primera pregunta (video) */
+                  <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border-2 sm:border-4 border-white/20" style={{ aspectRatio: '16/9' }}>
+                    {recordedVideo && (
+                      <video
+                        src={recordedVideo}
+                        controls
+                        className="w-full h-full object-contain bg-black"
+                      />
+                    )}
+                  </div>
+                ) : !isReviewMode && isVideoQuestion ? (
                   /* Estado: Recording/Idle - Solo muestra la cámara */
+                  <div className={`relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl transition-all duration-300 ${
+                    isRecording 
+                      ? 'ring-2 sm:ring-4 ring-red-500/50 animate-pulse border-2 sm:border-4 border-red-400' 
+                      : 'border-2 sm:border-4 border-white/20'
+                  }`} style={{ aspectRatio: '16/9' }}>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      muted
+                      className="w-full h-full object-contain bg-black"
+                      style={{ display: isRecording ? 'block' : 'none' }}
+                    />
+                    {!isRecording && (
+                      <div className="absolute inset-0 flex items-center justify-center text-white bg-black/50 backdrop-blur-sm">
+                        <div className="text-center">
+                          {countdownBeforeRecord > 0 ? (
+                            <>
+                              <div className="mb-4">
+                                <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto rounded-full bg-yellow-500/90 backdrop-blur-md flex items-center justify-center border-4 border-yellow-400 shadow-2xl">
+                                  <span className="text-4xl sm:text-5xl md:text-6xl font-bold text-white">{countdownBeforeRecord}</span>
+                                </div>
+                              </div>
+                              <p className="text-xl sm:text-2xl font-semibold text-white">Starting in {countdownBeforeRecord} second{countdownBeforeRecord !== 1 ? 's' : ''}</p>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-20 h-20 mx-auto mb-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              <p className="text-lg text-white/80">Camera preview will appear here</p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {/* Recording Indicator */}
+                    {isRecording && (
+                      <div className="absolute top-2 left-2 sm:top-4 sm:left-4 flex items-center gap-2 glass-card bg-red-500/90 backdrop-blur-md px-2 sm:px-4 py-1 sm:py-2 rounded-full">
+                        <div className="w-2 h-2 sm:w-3 sm:h-3 bg-white rounded-full animate-pulse"></div>
+                        <span className="text-white font-bold text-xs sm:text-sm">REC</span>
+                      </div>
+                    )}
+                  </div>
+                ) : !isVideoQuestion ? (
+                  /* Para preguntas de texto, mostrar cámara solo si no está en review mode */
                   <div className={`relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl transition-all duration-300 ${
                     isRecording 
                       ? 'ring-2 sm:ring-4 ring-red-500/50 animate-pulse border-2 sm:border-4 border-red-400' 
