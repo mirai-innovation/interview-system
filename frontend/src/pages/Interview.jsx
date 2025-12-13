@@ -1745,22 +1745,11 @@ const Interview = () => {
 
             {/* Video Container (The Lens) - Renderizado Condicional Estricto */}
             {/* Ocultar cámara durante transcripción - solo mostrar mensaje de transcripción */}
-            {/* Ocultar cámara cuando ya se transcribe (para todas las preguntas) */}
+            {/* Ocultar cámara cuando está en review mode (para todas las preguntas) */}
             {/* Mostrar video grabado si está en review mode para video question */}
-            {!isTranscribing && !answerSaved && !(isReviewMode && ((isVideoQuestion && videoPresentationTranscription) || (!isVideoQuestion && transcribedText))) && (
+            {!isTranscribing && !answerSaved && !isReviewMode && (
               <>
-                {isReviewMode && isVideoQuestion && recordedVideo ? (
-                  /* Estado: Review - Solo muestra el video grabado para la primera pregunta (video) */
-                  <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border-2 sm:border-4 border-white/20" style={{ aspectRatio: '16/9' }}>
-                    {recordedVideo && (
-                      <video
-                        src={recordedVideo}
-                        controls
-                        className="w-full h-full object-contain bg-black"
-                      />
-                    )}
-                  </div>
-                ) : !isReviewMode && isVideoQuestion ? (
+                {isVideoQuestion ? (
                   /* Estado: Recording/Idle - Solo muestra la cámara */
                   <div className={`relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl transition-all duration-300 ${
                     isRecording 
@@ -2084,6 +2073,19 @@ const Interview = () => {
                       : 'Recording Complete! Review and edit your transcribed answer below.'}
                   </p>
                 </div>
+              </div>
+            )}
+
+            {/* Video Presentation - Mostrar video grabado cuando está en review mode */}
+            {isReviewMode && !isTranscribing && isVideoQuestion && recordedVideo && (
+              <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border-2 sm:border-4 border-white/20 mb-6" style={{ aspectRatio: '16/9' }}>
+                {recordedVideo && (
+                  <video
+                    src={recordedVideo}
+                    controls
+                    className="w-full h-full object-contain bg-black"
+                  />
+                )}
               </div>
             )}
 
