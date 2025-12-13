@@ -605,7 +605,7 @@ const AdminPanel = () => {
                               {userDetails.questions.map((question, idx) => (
                                 <div key={idx} className="glass-card bg-white/40 border border-white/40 p-4 rounded-xl">
                                   <p className="font-semibold text-gray-900 mb-2">
-                                    {idx + 1}. {question}
+                                    {question}
                                   </p>
                                   <p className="text-gray-700 text-sm mb-3">
                                     {userDetails.interviewResponses && userDetails.interviewResponses[idx] ? (
@@ -650,7 +650,7 @@ const AdminPanel = () => {
                                 return (
                                   <div key={questionIndex} className="glass-card bg-white/40 border border-white/40 p-4 rounded-xl">
                                     <p className="font-semibold text-gray-900 mb-2">
-                                      {questionIndex + 1}. {question}
+                                      {question}
                                     </p>
                                     <p className="text-gray-700 text-sm mb-3">
                                       {answer || <span className="text-gray-400">No answer</span>}

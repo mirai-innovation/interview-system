@@ -1658,7 +1658,7 @@ const Interview = () => {
                     onCopy={(e) => e.preventDefault()}
                     onCut={(e) => e.preventDefault()}
                   >
-                    {isVideoQuestion ? currentQuestion : `${currentQuestionIndex}. ${currentQuestion}`}
+                    {currentQuestion}
                   </label>
                   {/* Reading indicator - basado en máquina de estados */}
                   {voiceState === 'READING_QUESTION' && (
