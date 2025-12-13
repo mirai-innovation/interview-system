@@ -184,7 +184,11 @@ const Interview = () => {
               savedAnswers.push('');
             }
           }
-          setAnswers(savedAnswers);
+          // savedAnswers contiene solo las respuestas de texto (no incluye el video)
+          // Necesitamos agregar un elemento vacío al inicio para el video (índice 0)
+          // para que answers[0] = '' (video), answers[1] = primera respuesta de texto, etc.
+          const answersWithVideo = ['', ...savedAnswers];
+          setAnswers(answersWithVideo);
           
             // Cargar video si existe (índice 0)
             if (response.data.interviewVideo) {
@@ -235,7 +239,9 @@ const Interview = () => {
           
           setCurrentQuestionIndex(startIndex);
         } else {
-          setAnswers(new Array(combinedQuestions.length).fill(''));
+          // Inicializar answers con un elemento extra al inicio para el video (índice 0)
+          // answers[0] = '' (video), answers[1+] = respuestas de texto
+          setAnswers(new Array(combinedQuestions.length + 1).fill(''));
           setCurrentQuestionIndex(0); // Empezar con video (índice 0)
         }
         
@@ -312,7 +318,7 @@ const Interview = () => {
         }
       } else {
         // No hay video guardado: leer pregunta con TTS, luego contador de 10s, luego grabar
-        const videoQuestion = "Please introduce yourself in 1 minute, speaking directly about your projects and skills. Record a video using your webcam.";
+        const videoQuestion = "Please introduce yourself in 1 minute, speaking directly about your projects and skills.";
         console.log('[START INTERVIEW] No hay video guardado, iniciando con TTS y countdown');
         setIsReviewMode(false);
         
@@ -367,8 +373,15 @@ const Interview = () => {
   // Auto-save answers to backend
   const saveAnswersAuto = async (answersToSave) => {
     try {
-      // Ensure we only save text answers (exactly allQuestions.length)
-      const textAnswersToSave = answersToSave.slice(0, allQuestions.length);
+      // answersToSave tiene tamaño allQuestions.length + 1
+      // answersToSave[0] corresponde al video (no se guarda aquí)
+      // answersToSave[1] corresponde a la primera pregunta de texto (allQuestions[0])
+      // answersToSave[2] corresponde a la segunda pregunta de texto (allQuestions[1])
+      // etc.
+      // Solo extraer las respuestas de texto (índices 1+)
+      const textAnswersToSave = answersToSave.length > allQuestions.length 
+        ? answersToSave.slice(1, allQuestions.length + 1)
+        : answersToSave.slice(0, allQuestions.length);
       // Pad if necessary to ensure correct length
       while (textAnswersToSave.length < allQuestions.length) {
         textAnswersToSave.push('');
@@ -1012,7 +1025,7 @@ const Interview = () => {
           }
         } else {
           // No hay video guardado: leer pregunta con TTS, luego contador de 5s, luego grabar
-          const videoQuestion = "Please introduce yourself in 1 minute, speaking directly about your projects and skills. Record a video using your webcam.";
+          const videoQuestion = "Please introduce yourself in 1 minute, speaking directly about your projects and skills.";
           console.log('[STATE] Iniciando video de autopresentación (índice 0) con TTS y countdown');
           setIsReviewMode(false); // Asegurar que no esté en modo review
           
@@ -1186,10 +1199,18 @@ const Interview = () => {
           if (currentQuestionIndex === 0) {
             setVideoPresentationTranscription(transcription);
             // Guardar el video en el progreso después de transcribirlo
+            // Para las respuestas de texto, solo enviar las respuestas de las preguntas de texto (índices 1+)
+            // answers[0] no se usa porque corresponde al video, no a una respuesta de texto
             if (publicUrl) {
               try {
+                // Extraer solo las respuestas de texto (desde índice 1 en adelante, que corresponden a las preguntas de texto)
+                const textAnswersOnly = answers.slice(1, allQuestions.length + 1);
+                // Asegurar que tenga la longitud correcta (allQuestions.length)
+                while (textAnswersOnly.length < allQuestions.length) {
+                  textAnswersOnly.push('');
+                }
                 await api.post('/users/save-interview-progress', {
-                  answers: answers.slice(0, allQuestions.length),
+                  answers: textAnswersOnly,
                   currentQuestionIndex: currentQuestionIndex,
                   s3VideoUrl: publicUrl,
                   videoTranscription: transcription
@@ -1339,8 +1360,10 @@ const Interview = () => {
       }
 
       // Only send text answers (exactly allQuestions.length, not including video question)
-      // Ensure the answers array matches the number of text questions
-      const textAnswers = answers.slice(0, allQuestions.length);
+      // answers[0] corresponde al video (no se envía), answers[1+] corresponden a las preguntas de texto
+      const textAnswers = answers.length > allQuestions.length 
+        ? answers.slice(1, allQuestions.length + 1)
+        : answers.slice(0, allQuestions.length);
       
       // Validate that we have the correct number of answers
       if (textAnswers.length !== allQuestions.length) {
@@ -1454,7 +1477,7 @@ const Interview = () => {
   const isVideoQuestion = currentQuestionIndex === 0; // Video question is FIRST (index 0)
   const isLastTextQuestion = currentQuestionIndex === allQuestions.length; // Last text question is at index allQuestions.length
   const currentQuestion = isVideoQuestion 
-    ? "Please introduce yourself in 1 minute, speaking directly about your projects and skills. Record a video using your webcam."
+    ? "Please introduce yourself in 1 minute, speaking directly about your projects and skills."
     : allQuestions[currentQuestionIndex - 1]; // Text questions start at index 1, so subtract 1 to get the question
 
   // Show completed message if interview is already completed
@@ -1722,8 +1745,9 @@ const Interview = () => {
 
             {/* Video Container (The Lens) - Renderizado Condicional Estricto */}
             {/* Ocultar cámara durante transcripción - solo mostrar mensaje de transcripción */}
+            {/* Ocultar cámara cuando ya se transcribe el video de presentación */}
             {/* Mostrar video grabado si está en review mode para video question */}
-            {!isTranscribing && !answerSaved && (
+            {!isTranscribing && !answerSaved && !(isReviewMode && isVideoQuestion && videoPresentationTranscription) && (
               <>
                 {isReviewMode && isVideoQuestion && recordedVideo ? (
                   /* Estado: Review - Solo muestra el video grabado para la primera pregunta (video) */
@@ -1870,30 +1894,9 @@ const Interview = () => {
               // Si es Video Question, usar controles especiales
               if (isVideoQuestion) {
                 // Estado: Review Mode para video question (PRIMERA pregunta, no la última)
+                // Los botones se mostrarán después del cuadro de transcripción (ver más abajo)
                 if (isReviewMode && !isTranscribing) {
-                  return (
-                    <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl -mt-4 sm:-mt-8 relative z-20">
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4">
-                        <button
-                          type="button"
-                          onClick={retakeRecording}
-                          className="glass-card bg-white/40 hover:bg-white/60 border border-white/30 text-gray-700 rounded-full px-4 sm:px-6 py-2 sm:py-3 font-semibold transition-all hover:scale-105 text-sm sm:text-base"
-                        >
-                          Retake Recording
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleNextQuestion}
-                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full px-6 sm:px-8 py-2 sm:py-3 font-semibold transition shadow-lg hover:shadow-xl text-sm sm:text-base flex items-center gap-2"
-                        >
-                          <span>Next Question</span>
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  );
+                  return null; // Los botones se mostrarán después de la transcripción
                 }
                 
                 // Estado: Recording/Idle para video question
@@ -2086,16 +2089,40 @@ const Interview = () => {
 
             {/* Video Presentation Transcription - Mostrar cuando está en review mode para video question */}
             {isReviewMode && !isTranscribing && isVideoQuestion && videoPresentationTranscription && (
-              <div className="glass-card bg-white/60 backdrop-blur-md border border-white/40 rounded-2xl p-4 sm:p-6 mb-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-2 sm:mb-3">
-                  <label className="block text-xs sm:text-sm font-semibold text-gray-700">
-                    Video Presentation Transcription:
-                  </label>
+              <>
+                <div className="glass-card bg-white/60 backdrop-blur-md border border-white/40 rounded-2xl p-4 sm:p-6 mb-6">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-2 sm:mb-3">
+                    <label className="block text-xs sm:text-sm font-semibold text-gray-700">
+                      Video Presentation Transcription:
+                    </label>
+                  </div>
+                  <div className="glass-card bg-white/80 backdrop-blur-sm border border-white/40 rounded-xl w-full py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-base text-gray-800 leading-relaxed">
+                    {videoPresentationTranscription}
+                  </div>
                 </div>
-                <div className="glass-card bg-white/80 backdrop-blur-sm border border-white/40 rounded-xl w-full py-3 sm:py-4 px-4 sm:px-6 text-sm sm:text-base text-gray-800 leading-relaxed">
-                  {videoPresentationTranscription}
+                {/* Botones Retake y Next Question - Aparecen después del cuadro de transcripción para video presentation */}
+                <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl mb-6">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4">
+                    <button
+                      type="button"
+                      onClick={retakeRecording}
+                      className="glass-card bg-white/40 hover:bg-white/60 border border-white/30 text-gray-700 rounded-full px-4 sm:px-6 py-2 sm:py-3 font-semibold transition-all hover:scale-105 text-sm sm:text-base"
+                    >
+                      Retake Recording
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNextQuestion}
+                      className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full px-6 sm:px-8 py-2 sm:py-3 font-semibold transition shadow-lg hover:shadow-xl text-sm sm:text-base flex items-center gap-2"
+                    >
+                      <span>Next Question</span>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
             {/* Editable Transcription - Panel lateral/colapsable solo en Review Mode */}

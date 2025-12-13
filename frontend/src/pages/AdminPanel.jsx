@@ -630,14 +630,13 @@ const AdminPanel = () => {
                           const allQuestions = [...generatedQuestions, ...defaultQuestions];
                           const responses = userDetails.interviewResponses || [];
                           
-                          // Ensure we have matching arrays
-                          const questionsToShow = allQuestions.slice(0, responses.length);
-                          
-                          return questionsToShow.length > 0 && (
+                          // Show all questions, matching each question with its corresponding response by index
+                          // interviewResponses array has the same length and order as allQuestions
+                          return allQuestions.length > 0 && (
                             <div>
                               <p className="text-sm font-semibold text-gray-700 mb-4">Questions and Answers</p>
                               <div className="space-y-4">
-                                {questionsToShow.map((question, idx) => (
+                                {allQuestions.map((question, idx) => (
                                   <div key={idx} className="glass-card bg-white/40 border border-white/40 p-4 rounded-xl">
                                     <p className="font-semibold text-gray-900 mb-2">
                                       {question}

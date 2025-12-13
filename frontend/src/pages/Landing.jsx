@@ -83,8 +83,7 @@ const Landing = () => {
             />
           </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4 sm:mb-6">
-            Intelligent Evaluation Platform and
-            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"> Selection System</span>
+            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Mirai Intelligent Evaluation Platform</span>
           </h1>
           <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 px-2 max-w-3xl mx-auto">
             Intelligent platform for the selection process of our academic programs.
