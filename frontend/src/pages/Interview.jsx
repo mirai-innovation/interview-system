@@ -1343,16 +1343,18 @@ const Interview = () => {
   };
 
   const retakeRecording = () => {
-    // Check if retake has already been used for this question
-    if (retakeUsed[currentQuestionIndex]) {
+    // Check if retake has already been used for this question (strict check)
+    if (retakeUsed[currentQuestionIndex] === true) {
+      setError('You have already used your retake for this question. You can only retake once.');
       return; // Already used retake for this question
     }
     
-    // Mark retake as used for current question
-    setRetakeUsed(prev => ({
-      ...prev,
+    // Mark retake as used for current question IMMEDIATELY (synchronous-like update)
+    const updatedRetakeUsed = {
+      ...retakeUsed,
       [currentQuestionIndex]: true
-    }));
+    };
+    setRetakeUsed(updatedRetakeUsed);
     
     // Cancel any ongoing transcription
     setIsTranscribing(false);
@@ -2220,15 +2222,21 @@ const Interview = () => {
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4">
                     <button
                       type="button"
-                      onClick={retakeRecording}
-                      disabled={retakeUsed[currentQuestionIndex]}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (retakeUsed[currentQuestionIndex] !== true) {
+                          retakeRecording();
+                        }
+                      }}
+                      disabled={retakeUsed[currentQuestionIndex] === true}
                       className={`glass-card border border-white/30 text-gray-700 rounded-full px-4 sm:px-6 py-2 sm:py-3 font-semibold transition-all text-sm sm:text-base ${
-                        retakeUsed[currentQuestionIndex]
+                        retakeUsed[currentQuestionIndex] === true
                           ? 'bg-gray-100/40 cursor-not-allowed opacity-50'
                           : 'bg-white/40 hover:bg-white/60 hover:scale-105'
                       }`}
                     >
-                      {retakeUsed[currentQuestionIndex] ? 'Retake Used' : 'Retake Recording'}
+                      {retakeUsed[currentQuestionIndex] === true ? 'Retake Used' : 'Retake Recording'}
                     </button>
                     <button
                       type="button"
@@ -2285,15 +2293,21 @@ const Interview = () => {
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4">
                     <button
                       type="button"
-                      onClick={retakeRecording}
-                      disabled={retakeUsed[currentQuestionIndex]}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (retakeUsed[currentQuestionIndex] !== true) {
+                          retakeRecording();
+                        }
+                      }}
+                      disabled={retakeUsed[currentQuestionIndex] === true}
                       className={`glass-card border border-white/30 text-gray-700 rounded-full px-4 sm:px-6 py-2 sm:py-3 font-semibold transition-all text-sm sm:text-base ${
-                        retakeUsed[currentQuestionIndex]
+                        retakeUsed[currentQuestionIndex] === true
                           ? 'bg-gray-100/40 cursor-not-allowed opacity-50'
                           : 'bg-white/40 hover:bg-white/60 hover:scale-105'
                       }`}
                     >
-                      {retakeUsed[currentQuestionIndex] ? 'Retake Used' : 'Retake Recording'}
+                      {retakeUsed[currentQuestionIndex] === true ? 'Retake Used' : 'Retake Recording'}
                     </button>
                     <button
                       type="button"
