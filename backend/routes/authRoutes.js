@@ -50,10 +50,33 @@ router.post("/register", async (req, res) => {
     // Validate age requirement (must be older than 20 years)
     const birthDate = new Date(dob);
     const today = new Date();
+    
+    // Validate date is valid
+    if (isNaN(birthDate.getTime())) {
+      return res.status(400).json({ message: "Invalid date of birth. Please enter a valid date." });
+    }
+    
+    // Validate date is not in the future
+    if (birthDate > today) {
+      return res.status(400).json({ message: "Date of birth cannot be in the future." });
+    }
+    
+    // Validate date is reasonable (not before 1900)
+    const minYear = 1900;
+    if (birthDate.getFullYear() < minYear) {
+      return res.status(400).json({ message: "Date of birth must be after 1900." });
+    }
+    
+    // Calculate age
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
+    }
+    
+    // Validate age is reasonable (not more than 120 years)
+    if (age > 120) {
+      return res.status(400).json({ message: "Please enter a valid date of birth." });
     }
     
     if (age <= 20) {
