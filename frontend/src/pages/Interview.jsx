@@ -1923,8 +1923,8 @@ const Interview = () => {
               </>
             )}
 
-            {/* Transcription Status - Mostrar solo durante transcripción (sin cámara visible) */}
-            {isTranscribing && !isReviewMode && !isVideoQuestion && (
+            {/* Transcription Status - Mostrar durante transcripción (para todas las preguntas incluyendo video) */}
+            {isTranscribing && !isReviewMode && (
               <div className="glass-card bg-white/90 backdrop-blur-md border border-white/40 rounded-2xl px-8 py-6 text-center shadow-xl mb-6">
                 <div className="flex flex-col items-center gap-3">
                   <div className="relative">
