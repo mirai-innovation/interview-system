@@ -12,7 +12,7 @@ router.use(adminMiddleware);
 // Listar usuarios
 router.get("/users", async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = "", role = "", isActive = "" } = req.query;
+    const { page = 1, limit, search = "", role = "", isActive = "" } = req.query;
     
     const query = {};
     if (search) {
@@ -24,17 +24,26 @@ router.get("/users", async (req, res) => {
     if (role) query.role = role;
     if (isActive !== "") query.isActive = isActive === "true";
 
-    const users = await User.find(query)
-      .select("-password")
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ createdAt: -1 });
-
     const total = await User.countDocuments(query);
+
+    // Si no se especifica límite, devolver todos los usuarios
+    let users;
+    if (limit) {
+      users = await User.find(query)
+        .select("-password")
+        .limit(limit * 1)
+        .skip((page - 1) * limit)
+        .sort({ createdAt: -1 });
+    } else {
+      // Sin límite, devolver todos
+      users = await User.find(query)
+        .select("-password")
+        .sort({ createdAt: -1 });
+    }
 
     res.json({
       users,
-      totalPages: Math.ceil(total / limit),
+      totalPages: limit ? Math.ceil(total / limit) : 1,
       currentPage: page,
       total
     });

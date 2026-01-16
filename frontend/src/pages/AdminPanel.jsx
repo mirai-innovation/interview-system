@@ -20,9 +20,11 @@ const AdminPanel = () => {
 
   const fetchUsers = async () => {
     try {
+      // Solicitar todos los usuarios sin límite de paginación
       const response = await api.get('/admin/users');
       setUsers(response.data.users);
     } catch (error) {
+      console.error('Error fetching users:', error);
     } finally {
       setLoading(false);
     }
