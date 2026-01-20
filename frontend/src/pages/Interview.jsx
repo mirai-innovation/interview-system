@@ -734,17 +734,65 @@ const Interview = () => {
     if (ttsPromiseRef.current) {
       ttsPromiseRef.current = null;
     }
+    
+    // CRITICAL: Clear countdown if TTS is cancelled
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+      setCountdownBeforeRecord(0);
+    }
+    
     setVoiceState('IDLE');
   };
 
   // Unified recording function - starts video + audio recording with speech recognition
   const startUnifiedRecording = async () => {
+    // CRITICAL: Prevent starting recording during invalid states
+    if (voiceState === 'READING_QUESTION' || voiceState === 'TRANSCRIBING') {
+      console.warn('[RECORDING] Cannot start recording during TTS or transcription');
+      return;
+    }
+    
+    if (countdownBeforeRecord > 0) {
+      console.warn('[RECORDING] Cannot start recording during countdown');
+      return;
+    }
+    
+    if (isRecording) {
+      console.warn('[RECORDING] Already recording');
+      return;
+    }
+    
+    if (isTranscribing) {
+      console.warn('[RECORDING] Cannot start recording during transcription');
+      return;
+    }
+    
     // If a pre-recording countdown is running, stop it
     if (countdownIntervalRef.current) {
       clearInterval(countdownIntervalRef.current);
       countdownIntervalRef.current = null;
       setCountdownBeforeRecord(0);
     }
+    
+    // Clean up any existing stream before starting new one
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    
+    // Clean up any existing media recorder
+    if (mediaRecorderRef.current) {
+      try {
+        if (mediaRecorderRef.current.state === 'recording') {
+          mediaRecorderRef.current.stop();
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+      mediaRecorderRef.current = null;
+    }
+    
     try {
       // Reset states
       setTranscribedText('');
@@ -864,6 +912,11 @@ const Interview = () => {
   };
 
   const stopUnifiedRecording = () => {
+    // Stop timer first
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
     
     // Stop video recording
     if (mediaRecorderRef.current) {
@@ -875,23 +928,24 @@ const Interview = () => {
           mediaRecorderRef.current.stop();
         }
       } catch (error) {
+        console.error('[STOP RECORDING] Error stopping media recorder:', error);
       }
     }
 
-    // Stop stream tracks (but don't set streamRef to null yet, wait for onstop)
+    // CRITICAL: Stop and clean up stream tracks immediately
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => {
         track.stop();
       });
-    }
-
-    // Stop timer
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = null;
+      // Clear video element srcObject to release camera
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      streamRef.current = null;
     }
 
     setIsRecording(false);
+    setVoiceState('IDLE');
     // Transcription will happen when videoBlob is ready (in useEffect)
   };
 
@@ -1071,23 +1125,31 @@ const Interview = () => {
           
           // REQUERIMIENTO 2.3: Esperar estrictamente a onAudioEnd
           readQuestionAloud(videoQuestion).then(() => {
-            // REQUERIMIENTO 2.4: Pausa de 10s visible antes de grabar
-            setCountdownBeforeRecord(10);
-            if (countdownIntervalRef.current) {
-              clearInterval(countdownIntervalRef.current);
+            // CRITICAL: Only start countdown if we're still on the same question and not already recording
+            if (currentQuestionIndex === 0 && !isRecording && !isTranscribing && voiceState !== 'RECORDING') {
+              // REQUERIMIENTO 2.4: Pausa de 10s visible antes de grabar
+              // Clear any existing countdown first
+              if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+                countdownIntervalRef.current = null;
+              }
+              setCountdownBeforeRecord(10);
+              countdownIntervalRef.current = setInterval(() => {
+                setCountdownBeforeRecord(prev => {
+                  if (prev <= 1) {
+                    clearInterval(countdownIntervalRef.current);
+                    countdownIntervalRef.current = null;
+                    setCountdownBeforeRecord(0);
+                    // Only start recording if still in valid state
+                    if (currentQuestionIndex === 0 && !isRecording && !isTranscribing && voiceState !== 'RECORDING') {
+                      startUnifiedRecording();
+                    }
+                    return 0;
+                  }
+                  return prev - 1;
+                });
+              }, 1000);
             }
-            countdownIntervalRef.current = setInterval(() => {
-              setCountdownBeforeRecord(prev => {
-                if (prev <= 1) {
-                  clearInterval(countdownIntervalRef.current);
-                  countdownIntervalRef.current = null;
-                  setCountdownBeforeRecord(0);
-                  startUnifiedRecording();
-                  return 0;
-                }
-                return prev - 1;
-              });
-            }, 1000);
           });
         }
       } else if (currentQuestionIndex > 0 && currentQuestionIndex <= allQuestions.length) {
@@ -1097,23 +1159,32 @@ const Interview = () => {
         if (currentQuestion) {
           // REQUERIMIENTO 2.3: Esperar estrictamente a onAudioEnd
           readQuestionAloud(currentQuestion).then(() => {
-            // REQUERIMIENTO 2.4: Pausa de 10s visible antes de grabar
-            setCountdownBeforeRecord(10);
-            if (countdownIntervalRef.current) {
-              clearInterval(countdownIntervalRef.current);
+            // CRITICAL: Only start countdown if we're still on the same question and not already recording
+            const questionIndexAtStart = currentQuestionIndex;
+            if (questionIndexAtStart > 0 && questionIndexAtStart <= allQuestions.length && !isRecording && !isTranscribing && voiceState !== 'RECORDING') {
+              // REQUERIMIENTO 2.4: Pausa de 10s visible antes de grabar
+              // Clear any existing countdown first
+              if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current);
+                countdownIntervalRef.current = null;
+              }
+              setCountdownBeforeRecord(10);
+              countdownIntervalRef.current = setInterval(() => {
+                setCountdownBeforeRecord(prev => {
+                  if (prev <= 1) {
+                    clearInterval(countdownIntervalRef.current);
+                    countdownIntervalRef.current = null;
+                    setCountdownBeforeRecord(0);
+                    // Only start recording if still in valid state and same question
+                    if (currentQuestionIndex === questionIndexAtStart && !isRecording && !isTranscribing && voiceState !== 'RECORDING') {
+                      startUnifiedRecording();
+                    }
+                    return 0;
+                  }
+                  return prev - 1;
+                });
+              }, 1000);
             }
-            countdownIntervalRef.current = setInterval(() => {
-              setCountdownBeforeRecord(prev => {
-                if (prev <= 1) {
-                  clearInterval(countdownIntervalRef.current);
-                  countdownIntervalRef.current = null;
-                  setCountdownBeforeRecord(0);
-                  startUnifiedRecording();
-                  return 0;
-                }
-                return prev - 1;
-              });
-            }, 1000);
           });
         }
       }
@@ -2122,7 +2193,9 @@ const Interview = () => {
                         <button
                           type="button"
                           onClick={startUnifiedRecording}
-                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shadow-xl hover:shadow-2xl transition-all hover:scale-110"
+                          disabled={voiceState === 'READING_QUESTION' || voiceState === 'TRANSCRIBING' || countdownBeforeRecord > 0 || isTranscribing}
+                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shadow-xl hover:shadow-2xl transition-all hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                          title={voiceState === 'READING_QUESTION' || countdownBeforeRecord > 0 ? 'Please wait for the question to finish' : ''}
                         >
                           <svg className="w-8 h-8 sm:w-10 sm:h-10" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
@@ -2224,7 +2297,9 @@ const Interview = () => {
                         <button
                           type="button"
                           onClick={startUnifiedRecording}
-                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shadow-xl hover:shadow-2xl transition-all hover:scale-110"
+                          disabled={voiceState === 'READING_QUESTION' || voiceState === 'TRANSCRIBING' || countdownBeforeRecord > 0 || isTranscribing}
+                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shadow-xl hover:shadow-2xl transition-all hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                          title={voiceState === 'READING_QUESTION' || countdownBeforeRecord > 0 ? 'Please wait for the question to finish' : ''}
                         >
                           <svg className="w-8 h-8 sm:w-10 sm:h-10" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
