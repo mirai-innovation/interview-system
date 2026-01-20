@@ -47,7 +47,7 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Missing required fields." });
     }
 
-    // Validate age requirement (must be older than 20 years)
+    // Validate age requirement (must be older than 18 years)
     const birthDate = new Date(dob);
     const today = new Date();
     
@@ -79,8 +79,8 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Please enter a valid date of birth." });
     }
     
-    if (age <= 20) {
-      return res.status(400).json({ message: "You must be older than 20 years to register." });
+    if (age <= 18) {
+      return res.status(400).json({ message: "You must be older than 18 years to register." });
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();

@@ -71,15 +71,15 @@ const Register = () => {
     e.preventDefault();
     setError('');
     
-    // Validate age requirement (must be older than 20 years)
+    // Validate age requirement (must be older than 18 years)
     if (formData.dob) {
       const age = calculateAge(formData.dob);
       if (age === null) {
-        setError('Please enter a valid date of birth. The date must be between 1900 and today, and you must be older than 20 years.');
+        setError('Please enter a valid date of birth. The date must be between 1900 and today, and you must be older than 18 years.');
         return;
       }
-      if (age <= 20) {
-        setError('You must be older than 20 years to register.');
+      if (age <= 18) {
+        setError('You must be older than 18 years to register.');
         return;
       }
       if (age > 120) {
