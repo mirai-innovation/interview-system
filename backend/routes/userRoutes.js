@@ -756,6 +756,76 @@ router.post("/save-interview-progress", authMiddleware, async (req, res) => {
   }
 });
 
+// Retake interview - Save reason and reset interview data
+router.post("/retake-interview", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { reason } = req.body;
+
+    if (!reason || reason.trim() === '') {
+      return res.status(400).json({ message: "Reason is required" });
+    }
+
+    // Save retake reason
+    user.retakeReason = reason.trim();
+
+    // Reset interview data
+    user.interviewResponses = [];
+    user.interviewVideo = undefined;
+    user.interviewVideoTranscription = undefined;
+    user.interviewScore = undefined;
+    user.interviewAnalysis = [];
+    user.interviewCompleted = false;
+
+    await user.save();
+
+    return res.json({ 
+      message: "Interview reset successfully. You can now retake the interview.",
+      retakeReason: user.retakeReason
+    });
+  } catch (error) {
+    console.error('Error in retake-interview:', error);
+    return res.status(500).json({ message: "Error resetting interview" });
+  }
+});
+
+// Satisfaction survey - Save feedback after interview submission
+router.post("/satisfaction-survey", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { rating, comments } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: "Rating must be between 1 and 5" });
+    }
+
+    // Save satisfaction survey
+    user.satisfactionSurvey = {
+      rating: rating,
+      comments: comments || '',
+      submittedAt: new Date()
+    };
+
+    await user.save();
+
+    return res.json({ 
+      message: "Thank you for your feedback!",
+      satisfactionSurvey: user.satisfactionSurvey
+    });
+  } catch (error) {
+    console.error('Error in satisfaction-survey:', error);
+    return res.status(500).json({ message: "Error submitting survey" });
+  }
+});
+
 // Text-to-Speech using Eleven Labs
 router.post("/text-to-speech", authMiddleware, async (req, res) => {
   try {

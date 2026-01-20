@@ -35,6 +35,12 @@ const userSchema = new mongoose.Schema(
       explanation: { type: String }
     }],
     interviewCompleted: { type: Boolean, default: false },
+    retakeReason: { type: String }, // Reason for retaking the interview
+    satisfactionSurvey: {
+      rating: { type: Number }, // 1-5 rating
+      comments: { type: String }, // Comments and improvements
+      submittedAt: { type: Date }
+    },
     
     // Cuestionarios
     softSkillsResults: {

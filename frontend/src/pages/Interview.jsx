@@ -46,6 +46,15 @@ const Interview = () => {
   const [tutorialVideoUrl, setTutorialVideoUrl] = useState(null); // URL del video tutorial
   const [tutorialVideoError, setTutorialVideoError] = useState(null); // Error al cargar el video tutorial
   const [retakeUsed, setRetakeUsed] = useState({}); // Track if retake has been used for each question index
+  
+  // New states for summary and retake flow
+  const [showSummary, setShowSummary] = useState(false); // Show summary before submit
+  const [showRetakeReason, setShowRetakeReason] = useState(false); // Show retake reason textbox
+  const [retakeReasonText, setRetakeReasonText] = useState(''); // Retake reason text
+  const [showSatisfactionSurvey, setShowSatisfactionSurvey] = useState(false); // Show satisfaction survey after submit
+  const [satisfactionRating, setSatisfactionRating] = useState(0); // Satisfaction rating 1-5
+  const [satisfactionComments, setSatisfactionComments] = useState(''); // Satisfaction comments
+  const [readyToSubmit, setReadyToSubmit] = useState(false); // Ready to show submit button
 
   // ============================================================================
   // STATE MACHINE: TTS/STT Voice Interaction Control
@@ -161,7 +170,13 @@ const Interview = () => {
   }, []);
 
   useEffect(() => {
-    if (timerActive && timeRemaining > 0) {
+    if (timerActive) {
+      // Clear any existing interval first to prevent duplicates
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      
       timerIntervalRef.current = setInterval(() => {
         setTimeRemaining(prev => {
           if (prev <= 1) {
@@ -175,15 +190,17 @@ const Interview = () => {
     } else {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
       }
     }
 
     return () => {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
       }
     };
-  }, [timerActive, timeRemaining]);
+  }, [timerActive]); // ✅ Fixed: Removed timeRemaining from dependencies
 
   const fetchProfile = async () => {
     try {
@@ -1707,8 +1724,8 @@ const Interview = () => {
       });
       
       setMessage('Interview submitted successfully');
-      // Redirect to Results page (Summary) instead of showing results here
-      navigate('/results');
+      // Show satisfaction survey instead of redirecting immediately
+      setShowSatisfactionSurvey(true);
     } catch (err) {
       setError(err.response?.data?.message || 'Error submitting interview');
     } finally {
@@ -2243,19 +2260,36 @@ const Interview = () => {
               }
 
               // Para preguntas de texto (no video question)
-              // Estado: Answer Saved - Botón Next o Submit según si es la última pregunta
+              // Estado: Answer Saved - Botón Next o mostrar resumen/submit según si es la última pregunta
               if (answerSaved && !isReviewMode && !isTranscribing) {
-                // Si es la última pregunta de texto, mostrar botón Submit
+                // Si es la última pregunta de texto
                 if (isLastTextQuestion) {
+                  // Si ya seleccionaron "submit", mostrar botón de submit
+                  if (readyToSubmit) {
+                    return (
+                      <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl -mt-4 sm:-mt-8 relative z-20">
+                        <div className="flex items-center justify-center">
+                          <button
+                            type="submit"
+                            disabled={submitting}
+                            className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-full px-6 sm:px-8 py-3 sm:py-4 font-bold text-base sm:text-lg shadow-xl hover:shadow-2xl transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {submitting ? 'Submitting...' : 'Submit Interview'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  // Si no, mostrar botón para ver resumen
                   return (
                     <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl -mt-4 sm:-mt-8 relative z-20">
                       <div className="flex items-center justify-center">
                         <button
-                          type="submit"
-                          disabled={submitting}
-                          className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-full px-6 sm:px-8 py-3 sm:py-4 font-bold text-base sm:text-lg shadow-xl hover:shadow-2xl transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                          type="button"
+                          onClick={() => setShowSummary(true)}
+                          className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-full px-6 sm:px-8 py-3 sm:py-4 font-bold text-base sm:text-lg shadow-xl hover:shadow-2xl transition-all hover:scale-105"
                         >
-                          {submitting ? 'Submitting...' : 'Submit Interview'}
+                          Review Final Answers
                         </button>
                       </div>
                     </div>
@@ -2540,6 +2574,211 @@ const Interview = () => {
           </form>
         </div>
       </div>
+
+      {/* Summary Modal - Before Submit */}
+      {showSummary && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="glass-card bg-white/90 backdrop-blur-xl border border-white/40 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-6">Review Your Final Answers</h2>
+            
+            {/* Summary of Answers */}
+            <div className="space-y-4 mb-6">
+              {/* Video Question */}
+              <div className="glass-card bg-white/60 p-4 rounded-xl">
+                <h3 className="font-semibold text-gray-900 mb-2">1. Video Presentation</h3>
+                {videoAnswers[0] ? (
+                  <p className="text-gray-600 text-sm">✓ Video recorded</p>
+                ) : (
+                  <p className="text-gray-400 text-sm">No video recorded</p>
+                )}
+              </div>
+              
+              {/* Text Questions */}
+              {allQuestions.map((question, idx) => {
+                const answerIndex = idx + 1; // answers[1] = allQuestions[0]
+                const answer = answers[answerIndex] || '';
+                return (
+                  <div key={idx} className="glass-card bg-white/60 p-4 rounded-xl">
+                    <h3 className="font-semibold text-gray-900 mb-2">{idx + 2}. {question}</h3>
+                    <p className="text-gray-600 text-sm whitespace-pre-wrap">
+                      {answer.trim() || <span className="text-gray-400 italic">No answer provided</span>}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button
+                onClick={() => {
+                  setShowSummary(false);
+                  setShowRetakeReason(true);
+                }}
+                className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white rounded-xl px-6 py-4 font-bold text-lg shadow-xl hover:shadow-2xl transition-all hover:scale-105"
+              >
+                I would like to retake the interview
+              </button>
+              <button
+                onClick={() => {
+                  setShowSummary(false);
+                  setReadyToSubmit(true);
+                }}
+                className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-xl px-6 py-4 font-bold text-lg shadow-xl hover:shadow-2xl transition-all hover:scale-105"
+              >
+                I would like to submit these final answers
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Retake Reason Modal */}
+      {showRetakeReason && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="glass-card bg-white/90 backdrop-blur-xl border border-white/40 rounded-3xl shadow-2xl max-w-2xl w-full p-6 sm:p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Why would you like to retake the interview?</h2>
+            <p className="text-gray-600 mb-4 text-sm">
+              Please describe your reason. Your previous interview data will be deleted.
+            </p>
+            
+            <textarea
+              value={retakeReasonText}
+              onChange={(e) => setRetakeReasonText(e.target.value)}
+              placeholder="Please describe why you would like to retake the interview..."
+              className="w-full h-32 p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none mb-4"
+              required
+            />
+            
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 rounded">
+              <p className="text-yellow-800 text-sm font-semibold">⚠️ Warning</p>
+              <p className="text-yellow-700 text-sm">Your previous interview data will be permanently deleted if you proceed.</p>
+            </div>
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => {
+                  setShowRetakeReason(false);
+                  setRetakeReasonText('');
+                }}
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl px-6 py-3 font-semibold transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!retakeReasonText.trim()) {
+                    setError('Please provide a reason for retaking the interview');
+                    return;
+                  }
+                  
+                  try {
+                    // Save retake reason and reset interview
+                    await api.post('/users/retake-interview', {
+                      reason: retakeReasonText
+                    });
+                    
+                    // Reset all interview states
+                    setShowRetakeReason(false);
+                    setRetakeReasonText('');
+                    setShowSummary(false);
+                    setReadyToSubmit(false);
+                    setAnswers(new Array(allQuestions.length + 1).fill(''));
+                    setVideoAnswers([]);
+                    setRecordedVideo(null);
+                    setVideoBlob(null);
+                    setVideoPresentationTranscription('');
+                    setCurrentQuestionIndex(0);
+                    setRetakeUsed({});
+                    setAnswerSaved(false);
+                    setIsReviewMode(false);
+                    setInterviewStarted(false);
+                    setMessage('Interview has been reset. You can now start again.');
+                  } catch (error) {
+                    setError(error.response?.data?.message || 'Error resetting interview');
+                  }
+                }}
+                disabled={!retakeReasonText.trim()}
+                className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white rounded-xl px-6 py-3 font-bold shadow-xl hover:shadow-2xl transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirm Retake
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Satisfaction Survey Modal */}
+      {showSatisfactionSurvey && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="glass-card bg-white/90 backdrop-blur-xl border border-white/40 rounded-3xl shadow-2xl max-w-2xl w-full p-6 sm:p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Satisfaction Survey</h2>
+            <p className="text-gray-600 mb-6 text-sm">Thank you for completing the interview! Please share your feedback.</p>
+            
+            {/* Rating */}
+            <div className="mb-6">
+              <label className="block text-gray-700 font-semibold mb-3">How would you rate your experience? *</label>
+              <div className="flex gap-2 justify-center">
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <button
+                    key={rating}
+                    type="button"
+                    onClick={() => setSatisfactionRating(rating)}
+                    className={`w-12 h-12 rounded-full font-bold text-lg transition-all hover:scale-110 ${
+                      satisfactionRating === rating
+                        ? 'bg-yellow-400 text-gray-900 shadow-lg'
+                        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                    }`}
+                  >
+                    {rating}
+                  </button>
+                ))}
+              </div>
+              <div className="flex justify-between text-xs text-gray-500 mt-2">
+                <span>Poor</span>
+                <span>Excellent</span>
+              </div>
+            </div>
+
+            {/* Comments */}
+            <div className="mb-6">
+              <label className="block text-gray-700 font-semibold mb-2">Comments and Suggestions for Improvement</label>
+              <textarea
+                value={satisfactionComments}
+                onChange={(e) => setSatisfactionComments(e.target.value)}
+                placeholder="Please share any comments or suggestions to help us improve..."
+                className="w-full h-32 p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+            </div>
+
+            <button
+              onClick={async () => {
+                if (satisfactionRating === 0) {
+                  setError('Please provide a rating');
+                  return;
+                }
+                
+                try {
+                  await api.post('/users/satisfaction-survey', {
+                    rating: satisfactionRating,
+                    comments: satisfactionComments
+                  });
+                  
+                  setShowSatisfactionSurvey(false);
+                  setMessage('Thank you for your feedback!');
+                  navigate('/results');
+                } catch (error) {
+                  setError(error.response?.data?.message || 'Error submitting survey');
+                }
+              }}
+              disabled={satisfactionRating === 0}
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl px-6 py-4 font-bold text-lg shadow-xl hover:shadow-2xl transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Submit Feedback
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
