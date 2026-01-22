@@ -41,6 +41,12 @@ const userSchema = new mongoose.Schema(
       comments: { type: String }, // Comments and improvements
       submittedAt: { type: Date }
     },
+    reports: [{
+      type: { type: String, enum: ['problem', 'survey', 'feedback'], required: true }, // Type of report
+      subject: { type: String }, // Subject/title of the report
+      message: { type: String, required: true }, // Report message
+      submittedAt: { type: Date, default: Date.now } // When the report was submitted
+    }],
     
     // Cuestionarios
     softSkillsResults: {

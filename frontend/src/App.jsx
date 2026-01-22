@@ -10,6 +10,7 @@ import CVUpload from './pages/CVUpload';
 import Interview from './pages/Interview';
 import Results from './pages/Results';
 import AdminPanel from './pages/AdminPanel';
+import ReportProblem from './pages/ReportProblem';
 import PrivateRoute from './components/PrivateRoute';
 import AdminRoute from './components/AdminRoute';
 import './App.css';
@@ -62,6 +63,14 @@ function App() {
               <AdminRoute>
                 <AdminPanel />
               </AdminRoute>
+            }
+          />
+          <Route
+            path="/report"
+            element={
+              <PrivateRoute>
+                <ReportProblem />
+              </PrivateRoute>
             }
           />
         </Routes>

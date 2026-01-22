@@ -58,6 +58,12 @@ const Navbar = () => {
                 >
                   Summary
                 </Link>
+                <Link 
+                  to="/report" 
+                  className="text-gray-700 hover:text-blue-600 font-medium transition px-3 py-2 rounded-lg hover:bg-white/50"
+                >
+                  Report
+                </Link>
                 {user.role === 'admin' && (
                   <Link 
                     to="/admin" 
@@ -138,6 +144,13 @@ const Navbar = () => {
                 className="text-gray-700 hover:text-blue-600 font-medium transition px-3 py-2 rounded-lg hover:bg-white/50"
               >
                 Summary
+              </Link>
+              <Link 
+                to="/report" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-blue-600 font-medium transition px-3 py-2 rounded-lg hover:bg-white/50"
+              >
+                Report
               </Link>
               {user.role === 'admin' && (
                 <Link 

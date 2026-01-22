@@ -873,6 +873,49 @@ router.post("/reset-interview-only", authMiddleware, async (req, res) => {
   }
 });
 
+// Report problem or submit survey/feedback
+router.post("/report", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { type, subject, message } = req.body;
+
+    if (!type || !['problem', 'survey', 'feedback'].includes(type)) {
+      return res.status(400).json({ message: "Invalid report type. Must be 'problem', 'survey', or 'feedback'" });
+    }
+
+    if (!message || message.trim() === '') {
+      return res.status(400).json({ message: "Message is required" });
+    }
+
+    // Initialize reports array if it doesn't exist
+    if (!user.reports) {
+      user.reports = [];
+    }
+
+    // Add new report
+    user.reports.push({
+      type: type,
+      subject: subject || '',
+      message: message.trim(),
+      submittedAt: new Date()
+    });
+
+    await user.save();
+
+    return res.json({ 
+      message: "Report submitted successfully. Thank you for your feedback!",
+      report: user.reports[user.reports.length - 1]
+    });
+  } catch (error) {
+    console.error('Error in report:', error);
+    return res.status(500).json({ message: "Error submitting report" });
+  }
+});
+
 // Satisfaction survey - Save feedback after interview submission
 router.post("/satisfaction-survey", authMiddleware, async (req, res) => {
   try {
