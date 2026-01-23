@@ -46,6 +46,9 @@ const userSchema = new mongoose.Schema(
       subject: { type: String }, // Subject/title of the report
       message: { type: String, required: true }, // Report message
       submittedAt: { type: Date, default: Date.now }, // When the report was submitted
+      resolved: { type: Boolean, default: false }, // Whether the report has been resolved
+      resolvedAt: { type: Date }, // When the report was resolved
+      resolvedBy: { type: String }, // Admin who resolved it
       messages: [{ // Thread of messages between user and admin
         sender: { type: String, enum: ['user', 'admin'], required: true }, // Who sent the message
         senderName: { type: String }, // Name of the sender (for admin responses)

@@ -403,15 +403,27 @@ router.post("/users/:userId/reports/:reportIndex/respond", async (req, res) => {
 
     // Send email notification to user
     try {
-      await sendReportResponseNotification(
+      console.log(`Attempting to send email notification to ${user.email} for report response`);
+      const emailResult = await sendReportResponseNotification(
         user.email,
         user.name,
         report.subject || 'Your Report',
         message.trim(),
         adminName
       );
+      
+      if (emailResult.success) {
+        console.log(`Email notification sent successfully to ${user.email}. Message ID: ${emailResult.messageId}`);
+      } else {
+        console.error(`Failed to send email notification to ${user.email}:`, emailResult.error);
+      }
     } catch (emailError) {
       console.error('Error sending email notification:', emailError);
+      console.error('Error details:', {
+        message: emailError.message,
+        stack: emailError.stack,
+        userEmail: user.email
+      });
       // Don't fail the request if email fails
     }
 
@@ -421,6 +433,48 @@ router.post("/users/:userId/reports/:reportIndex/respond", async (req, res) => {
     });
   } catch (error) {
     console.error('Error in respond to report:', error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
+// Mark report as resolved
+router.patch("/users/:userId/reports/:reportIndex/resolve", async (req, res) => {
+  try {
+    const { userId, reportIndex } = req.params;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!user.reports || !Array.isArray(user.reports) || user.reports.length === 0) {
+      return res.status(404).json({ message: "User has no reports" });
+    }
+
+    const index = parseInt(reportIndex);
+    if (isNaN(index) || index < 0 || index >= user.reports.length) {
+      return res.status(400).json({ message: "Invalid report index" });
+    }
+
+    const report = user.reports[index];
+    
+    // Get admin info
+    const admin = await User.findById(req.userId);
+    const adminName = admin ? admin.name : 'Admin';
+
+    // Mark as resolved
+    report.resolved = true;
+    report.resolvedAt = new Date();
+    report.resolvedBy = adminName;
+
+    await user.save();
+
+    res.json({
+      message: "Report marked as resolved",
+      report: report
+    });
+  } catch (error) {
+    console.error('Error in resolve report:', error);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 });

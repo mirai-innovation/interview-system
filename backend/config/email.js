@@ -472,10 +472,24 @@ Evaluation and Selection System`;
 
 export const sendReportResponseNotification = async (userEmail, userName, reportSubject, adminMessage, adminName) => {
   try {
-    const transporter = createTransporter();
-    await transporter.verify();
+    console.log(`[sendReportResponseNotification] Starting email send to ${userEmail}`);
     
-    const reportUrl = `${process.env.FRONTEND_URL}/report`;
+    // Validate required environment variables
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.error('[sendReportResponseNotification] Missing email credentials');
+      return { success: false, error: 'Email credentials not configured' };
+    }
+    
+    if (!process.env.FRONTEND_URL) {
+      console.warn('[sendReportResponseNotification] FRONTEND_URL not set, using placeholder');
+    }
+    
+    const transporter = createTransporter();
+    console.log(`[sendReportResponseNotification] Verifying email connection...`);
+    await transporter.verify();
+    console.log(`[sendReportResponseNotification] Email connection verified successfully`);
+    
+    const reportUrl = `${process.env.FRONTEND_URL || 'https://interview-system-c1q9.vercel.app'}/report`;
     
     // Plain text version
     const textVersion = `Mirai Innovation Research Institute - Response to Your Report
@@ -586,9 +600,25 @@ ${adminMessage}
       }
     };
 
+    console.log(`[sendReportResponseNotification] Sending email to ${userEmail}...`);
     const result = await transporter.sendMail(mailOptions);
+    console.log(`[sendReportResponseNotification] Email sent successfully. Message ID: ${result.messageId}`);
+    console.log(`[sendReportResponseNotification] Email response:`, {
+      messageId: result.messageId,
+      accepted: result.accepted,
+      rejected: result.rejected,
+      response: result.response
+    });
     return { success: true, messageId: result.messageId };
   } catch (error) {
-    return { success: false, error: error.message };
+    console.error(`[sendReportResponseNotification] Error sending email:`, {
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode,
+      stack: error.stack
+    });
+    return { success: false, error: error.message, details: error };
   }
 };

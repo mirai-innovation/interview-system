@@ -7,6 +7,7 @@ const ReportItem = ({ report, reportIndex, userId, userName, onResponseSent }) =
   const [responseMessage, setResponseMessage] = useState('');
   const [sendingResponse, setSendingResponse] = useState(false);
   const [showResponseForm, setShowResponseForm] = useState(false);
+  const [resolving, setResolving] = useState(false);
 
   const handleRespond = async () => {
     if (!responseMessage.trim()) {
@@ -30,6 +31,23 @@ const ReportItem = ({ report, reportIndex, userId, userName, onResponseSent }) =
     }
   };
 
+  const handleResolve = async () => {
+    if (!confirm('Are you sure you want to mark this report as resolved? It will no longer appear in the notifications.')) {
+      return;
+    }
+
+    setResolving(true);
+    try {
+      await api.patch(`/admin/users/${userId}/reports/${reportIndex}/resolve`);
+      await onResponseSent(userId);
+      alert('Report marked as resolved successfully!');
+    } catch (error) {
+      alert(error.response?.data?.message || 'Error resolving report');
+    } finally {
+      setResolving(false);
+    }
+  };
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleString('en-US', {
@@ -42,7 +60,7 @@ const ReportItem = ({ report, reportIndex, userId, userName, onResponseSent }) =
   };
 
   return (
-    <div className="bg-white/40 border border-white/40 p-4 rounded-xl space-y-4">
+    <div className={`bg-white/40 border border-white/40 p-4 rounded-xl space-y-4 ${report.resolved ? 'opacity-75' : ''}`}>
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -52,6 +70,11 @@ const ReportItem = ({ report, reportIndex, userId, userName, onResponseSent }) =
           }`}>
             {report.type === 'problem' ? 'Problem' : report.type === 'survey' ? 'Survey' : 'Feedback'}
           </span>
+          {report.resolved && (
+            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+              ✓ Resolved
+            </span>
+          )}
           {report.subject && (
             <span className="font-semibold text-gray-900 text-sm">{report.subject}</span>
           )}
@@ -60,6 +83,11 @@ const ReportItem = ({ report, reportIndex, userId, userName, onResponseSent }) =
           {formatDate(report.submittedAt)}
         </span>
       </div>
+      {report.resolved && report.resolvedAt && (
+        <div className="text-xs text-gray-500 mb-2">
+          Resolved by {report.resolvedBy || 'Admin'} on {formatDate(report.resolvedAt)}
+        </div>
+      )}
       <p className="text-sm text-gray-700 whitespace-pre-wrap">{report.message}</p>
 
       {/* Messages Thread */}
@@ -90,43 +118,56 @@ const ReportItem = ({ report, reportIndex, userId, userName, onResponseSent }) =
       )}
 
       {/* Response Form */}
-      {showResponseForm ? (
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <textarea
-            value={responseMessage}
-            onChange={(e) => setResponseMessage(e.target.value)}
-            placeholder="Type your response to the user..."
-            rows={4}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white resize-none mb-3"
-            disabled={sendingResponse}
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                setShowResponseForm(false);
-                setResponseMessage('');
-              }}
-              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition-all"
-              disabled={sendingResponse}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleRespond}
-              disabled={sendingResponse || !responseMessage.trim()}
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {sendingResponse ? 'Sending...' : 'Send Response'}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button
-          onClick={() => setShowResponseForm(true)}
-          className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all"
-        >
-          Respond to Report
-        </button>
+      {!report.resolved && (
+        <>
+          {showResponseForm ? (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <textarea
+                value={responseMessage}
+                onChange={(e) => setResponseMessage(e.target.value)}
+                placeholder="Type your response to the user..."
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white resize-none mb-3"
+                disabled={sendingResponse}
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowResponseForm(false);
+                    setResponseMessage('');
+                  }}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition-all"
+                  disabled={sendingResponse}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRespond}
+                  disabled={sendingResponse || !responseMessage.trim()}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {sendingResponse ? 'Sending...' : 'Send Response'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
+              <button
+                onClick={() => setShowResponseForm(true)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all"
+              >
+                Respond to Report
+              </button>
+              <button
+                onClick={handleResolve}
+                disabled={resolving}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {resolving ? 'Resolving...' : 'Mark as Resolved'}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -142,7 +183,7 @@ const AdminPanel = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [sortBy, setSortBy] = useState(''); // Sort by: 'both', 'cv-only', 'none'
+  const [sortBy, setSortBy] = useState(''); // Sort by: 'both', 'cv-only', 'none', 'with-reports'
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailSubject, setEmailSubject] = useState('');
   const [emailMessage, setEmailMessage] = useState('');
@@ -305,6 +346,9 @@ const AdminPanel = () => {
     const hasCVScore = user.score !== undefined && user.score !== null;
     const hasInterviewScore = user.interviewScore !== undefined && user.interviewScore !== null;
     
+    // Check for unresolved reports
+    const hasUnresolvedReports = user.reports && user.reports.some(report => !report.resolved);
+    
     if (sortBy === 'both') {
       // Only show users with both CV and Interview scores
       if (!hasCVScore || !hasInterviewScore) return false;
@@ -314,6 +358,9 @@ const AdminPanel = () => {
     } else if (sortBy === 'none') {
       // Only show users with no scores
       if (hasCVScore || hasInterviewScore) return false;
+    } else if (sortBy === 'with-reports') {
+      // Only show users with unresolved reports
+      if (!hasUnresolvedReports) return false;
     }
     // If sortBy is empty, show all
     
@@ -330,6 +377,12 @@ const AdminPanel = () => {
   } else if (sortBy === 'cv-only') {
     filteredUsers = [...filteredUsers].sort((a, b) => {
       return (b.score || 0) - (a.score || 0); // Descending order
+    });
+  } else if (sortBy === 'with-reports') {
+    filteredUsers = [...filteredUsers].sort((a, b) => {
+      const aUnresolved = a.reports ? a.reports.filter(r => !r.resolved).length : 0;
+      const bUnresolved = b.reports ? b.reports.filter(r => !r.resolved).length : 0;
+      return bUnresolved - aUnresolved; // Descending order (most reports first)
     });
   }
 
@@ -495,6 +548,7 @@ const AdminPanel = () => {
                 <option value="both">CV + Interview Scores</option>
                 <option value="cv-only">CV Score Only</option>
                 <option value="none">No Scores</option>
+                <option value="with-reports">With Unresolved Reports</option>
               </select>
             </div>
           </div>
@@ -542,8 +596,10 @@ const AdminPanel = () => {
                   </tr>
                 ) : (
                   filteredUsers.map((user) => {
-                  const hasReports = user.reports && user.reports.length > 0;
-                  const reportsCount = user.reports ? user.reports.length : 0;
+                  // Only count unresolved reports for notifications
+                  const unresolvedReports = user.reports ? user.reports.filter(report => !report.resolved) : [];
+                  const hasReports = unresolvedReports.length > 0;
+                  const reportsCount = unresolvedReports.length;
                   
                   return (
                   <tr 
