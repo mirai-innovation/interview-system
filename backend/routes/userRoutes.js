@@ -921,6 +921,73 @@ router.post("/report", authMiddleware, async (req, res) => {
   }
 });
 
+// Get user reports
+router.get("/reports", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.json({
+      reports: user.reports || []
+    });
+  } catch (error) {
+    console.error('Error fetching reports:', error);
+    return res.status(500).json({ message: "Error fetching reports" });
+  }
+});
+
+// User respond to their own report
+router.post("/reports/:reportIndex/respond", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { reportIndex } = req.params;
+    const { message } = req.body;
+
+    if (!message || message.trim() === '') {
+      return res.status(400).json({ message: "Message is required" });
+    }
+
+    if (!user.reports || !Array.isArray(user.reports) || user.reports.length === 0) {
+      return res.status(404).json({ message: "User has no reports" });
+    }
+
+    const index = parseInt(reportIndex);
+    if (isNaN(index) || index < 0 || index >= user.reports.length) {
+      return res.status(400).json({ message: "Invalid report index" });
+    }
+
+    const report = user.reports[index];
+    
+    // Initialize messages array if it doesn't exist
+    if (!report.messages) {
+      report.messages = [];
+    }
+
+    // Add user response to messages
+    report.messages.push({
+      sender: 'user',
+      message: message.trim(),
+      sentAt: new Date()
+    });
+
+    await user.save();
+
+    return res.json({
+      message: "Response sent successfully",
+      report: report
+    });
+  } catch (error) {
+    console.error('Error in respond to report:', error);
+    return res.status(500).json({ message: "Error sending response" });
+  }
+});
+
 // Satisfaction survey - Save feedback after interview submission
 router.post("/satisfaction-survey", authMiddleware, async (req, res) => {
   try {

@@ -356,5 +356,74 @@ This is an automated email, please do not reply to this message.`;
   }
 });
 
+// Admin respond to user report
+router.post("/users/:userId/reports/:reportIndex/respond", async (req, res) => {
+  try {
+    const { userId, reportIndex } = req.params;
+    const { message } = req.body;
+
+    if (!message || message.trim() === '') {
+      return res.status(400).json({ message: "Message is required" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!user.reports || !Array.isArray(user.reports) || user.reports.length === 0) {
+      return res.status(404).json({ message: "User has no reports" });
+    }
+
+    const index = parseInt(reportIndex);
+    if (isNaN(index) || index < 0 || index >= user.reports.length) {
+      return res.status(400).json({ message: "Invalid report index" });
+    }
+
+    const report = user.reports[index];
+    
+    // Initialize messages array if it doesn't exist
+    if (!report.messages) {
+      report.messages = [];
+    }
+
+    // Get admin info
+    const admin = await User.findById(req.userId);
+    const adminName = admin ? admin.name : 'Admin';
+
+    // Add admin response to messages
+    report.messages.push({
+      sender: 'admin',
+      senderName: adminName,
+      message: message.trim(),
+      sentAt: new Date()
+    });
+
+    await user.save();
+
+    // Send email notification to user
+    try {
+      await sendReportResponseNotification(
+        user.email,
+        user.name,
+        report.subject || 'Your Report',
+        message.trim(),
+        adminName
+      );
+    } catch (emailError) {
+      console.error('Error sending email notification:', emailError);
+      // Don't fail the request if email fails
+    }
+
+    res.json({
+      message: "Response sent successfully",
+      report: report
+    });
+  } catch (error) {
+    console.error('Error in respond to report:', error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
 export default router;
 
