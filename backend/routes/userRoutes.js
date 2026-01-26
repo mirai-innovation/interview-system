@@ -29,11 +29,11 @@ const __dirname = path.dirname(__filename);
 const router = express.Router();
 
 // Helper function to transcribe and respond
-async function transcribeAndRespond(filePathToTranscribe, tempFilePath, req, res) {
+async function transcribeAndRespond(filePathToTranscribe, tempFilePath, req, res, language = 'en') {
   try {
     let transcription;
     try {
-      transcription = await transcribeVideoAudio(filePathToTranscribe);
+      transcription = await transcribeVideoAudio(filePathToTranscribe, language);
     } catch (transcriptionError) {
       throw transcriptionError;
     }
@@ -309,6 +309,7 @@ router.post("/transcribe-video", authMiddleware, async (req, res) => {
   let tempFilePath = null;
   let filePathToTranscribe = null;
   let s3Url = null;
+  const language = req.body.language || 'en'; // Get language from request, default to 'en'
   
   try {
     // Check if we have an S3 URL (direct upload) or a file upload
@@ -502,7 +503,7 @@ router.post("/transcribe-video", authMiddleware, async (req, res) => {
           
           // Continue with transcription
           try {
-            await transcribeAndRespond(filePathToTranscribe, tempFilePath, req, res);
+            await transcribeAndRespond(filePathToTranscribe, tempFilePath, req, res, language);
             resolve();
           } catch (error) {
             reject(error);
@@ -513,7 +514,7 @@ router.post("/transcribe-video", authMiddleware, async (req, res) => {
     }
 
     // Transcribe using the file path we have
-    await transcribeAndRespond(filePathToTranscribe, tempFilePath, req, res);
+    await transcribeAndRespond(filePathToTranscribe, tempFilePath, req, res, language);
   } catch (error) {
     // Try to delete temp file even on error
     if (tempFilePath && fs.existsSync(tempFilePath)) {

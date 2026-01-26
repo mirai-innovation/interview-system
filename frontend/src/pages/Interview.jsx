@@ -46,6 +46,7 @@ const Interview = () => {
   const [tutorialVideoUrl, setTutorialVideoUrl] = useState(null); // URL del video tutorial
   const [tutorialVideoError, setTutorialVideoError] = useState(null); // Error al cargar el video tutorial
   const [retakeUsed, setRetakeUsed] = useState({}); // Track if retake has been used for each question index
+  const [selectedLanguage, setSelectedLanguage] = useState('en'); // Language for transcription: 'en' or 'es'
   
   // New states for summary and retake flow
   const [showSummary, setShowSummary] = useState(false); // Show summary before submit
@@ -1300,7 +1301,8 @@ const Interview = () => {
       const timeoutMs = 180000; // 3 minutes for transcription
       const response = await Promise.race([
         api.post('/users/transcribe-video', {
-          s3Url: publicUrl
+          s3Url: publicUrl,
+          language: selectedLanguage // Send selected language to backend
         }, {
           headers: {
             'Content-Type': 'application/json',
@@ -1961,6 +1963,64 @@ const Interview = () => {
                     Loading tutorial video...
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Language Selection */}
+            <div className="glass-card bg-gradient-to-br from-blue-50/80 to-purple-50/80 border border-blue-200/50 rounded-2xl p-6 sm:p-8 mb-8">
+              <h3 className="font-bold text-gray-900 mb-4 sm:mb-6 text-lg sm:text-xl flex items-center gap-2">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                </svg>
+                Select Interview Language / Seleccionar Idioma de la Entrevista
+              </h3>
+              <p className="text-gray-700 text-sm sm:text-base mb-4">
+                Choose the language you will use to answer the interview questions. This will ensure accurate transcription of your responses.
+              </p>
+              <p className="text-gray-600 text-xs sm:text-sm mb-4 italic">
+                Elige el idioma que usarás para responder las preguntas de la entrevista. Esto asegurará una transcripción precisa de tus respuestas.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button
+                  onClick={() => setSelectedLanguage('en')}
+                  className={`flex-1 p-4 rounded-xl border-2 transition-all duration-300 ${
+                    selectedLanguage === 'en'
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white border-blue-600 shadow-lg transform scale-105'
+                      : 'bg-white/60 text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50/60'
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                    </svg>
+                    <span className="font-semibold">English</span>
+                    {selectedLanguage === 'en' && (
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                </button>
+                <button
+                  onClick={() => setSelectedLanguage('es')}
+                  className={`flex-1 p-4 rounded-xl border-2 transition-all duration-300 ${
+                    selectedLanguage === 'es'
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white border-blue-600 shadow-lg transform scale-105'
+                      : 'bg-white/60 text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50/60'
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                    </svg>
+                    <span className="font-semibold">Español</span>
+                    {selectedLanguage === 'es' && (
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                </button>
               </div>
             </div>
 

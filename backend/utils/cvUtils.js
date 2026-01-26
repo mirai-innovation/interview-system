@@ -593,7 +593,7 @@ function filterWhisperHallucinations(text) {
 }
 
 // Transcribe audio from video using Whisper API
-export async function transcribeVideoAudio(filePath) {
+export async function transcribeVideoAudio(filePath, language = 'en') {
   let transcriptionAttempts = 0;
   const maxTranscriptionAttempts = 3;
   
@@ -607,6 +607,13 @@ export async function transcribeVideoAudio(filePath) {
     throw new Error(`Video file is too small (${fileStats.size} bytes). The video may not contain audio.`);
   }
   
+  // Validate language parameter (only 'en' and 'es' are supported)
+  const validLanguage = (language === 'es' || language === 'en') ? language : 'en';
+  
+  // Set prompt based on language
+  const prompt = validLanguage === 'es' 
+    ? 'Entrevista de trabajo en español. Transcripción precisa de la respuesta del candidato:'
+    : 'Job interview in English. Precise transcription of the candidate\'s answer:';
   
   while (transcriptionAttempts < maxTranscriptionAttempts) {
     try {
@@ -619,11 +626,11 @@ export async function transcribeVideoAudio(filePath) {
       const transcriptionPromise = openai.audio.transcriptions.create({
         file: fileStream,
         model: 'whisper-1',
-        language: 'en', // Critical: Set to Spanish to correctly identify source audio
+        language: validLanguage, // Use selected language ('en' or 'es')
         response_format: 'text',
         temperature: 0, // Reduce hallucinations: 0 = more deterministic, less creative
         // Context-setting prompt to prime the style (instructions are often ignored by Whisper)
-        prompt: 'Job interview in English. Precise transcription of the candidate\'s answer:'
+        prompt: prompt
       });
       
       // Race between transcription and timeout (90 seconds for larger files)

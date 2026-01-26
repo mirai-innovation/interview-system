@@ -513,7 +513,7 @@ export const sendReportResponseNotification = async (userEmail, userName, report
     await transporter.verify();
     console.log(`[sendReportResponseNotification] Email connection verified successfully`);
     
-    const reportUrl = `${process.env.FRONTEND_URL || 'https://interview-system-c1q9.vercel.app'}/report`;
+    const reportUrl = `${process.env.FRONTEND_URL || 'https://studentportal.mirai-education.tech'}/report`;
     
     // Escape HTML for safe insertion
     const safeUserName = escapeHtml(userName || 'User');
