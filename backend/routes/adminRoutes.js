@@ -4,6 +4,7 @@ import User from "../models/User.js";
 import { authMiddleware } from "./authRoutes.js";
 import { adminMiddleware } from "../middleware/adminMiddleware.js";
 import { sendBulkEmailToActiveUsers, sendReportResponseNotification } from "../config/email.js";
+import * as XLSX from "xlsx";
 
 const router = express.Router();
 
@@ -105,6 +106,78 @@ router.get("/users/:userId", async (req, res) => {
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
+// Export users data to Excel/CSV
+router.get("/export-users", async (req, res) => {
+  try {
+    const { format = 'xlsx' } = req.query; // 'xlsx' or 'csv'
+    
+    // Get all users with required fields
+    const users = await User.find({})
+      .select("name email score interviewScore")
+      .sort({ name: 1 });
+    
+    // Prepare data for export
+    const exportData = users.map(user => ({
+      'Nombre': user.name || '',
+      'Email': user.email || '',
+      'Score CV': user.score !== undefined && user.score !== null ? user.score : 'N/A',
+      'Score Interview': user.interviewScore !== undefined && user.interviewScore !== null ? user.interviewScore : 'N/A'
+    }));
+    
+    if (format === 'csv') {
+      // Generate CSV
+      const headers = ['Nombre', 'Email', 'Score CV', 'Score Interview'];
+      const csvRows = [
+        headers.join(','),
+        ...exportData.map(row => 
+          headers.map(header => {
+            const value = row[header];
+            // Escape commas and quotes in CSV
+            if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+              return `"${value.replace(/"/g, '""')}"`;
+            }
+            return value;
+          }).join(',')
+        )
+      ];
+      
+      const csv = csvRows.join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="users_export_${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send('\ufeff' + csv); // Add BOM for Excel UTF-8 compatibility
+    } else {
+      // Generate Excel (XLSX)
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Users');
+      
+      // Set column widths
+      const columnWidths = [
+        { wch: 30 }, // Nombre
+        { wch: 35 }, // Email
+        { wch: 12 }, // Score CV
+        { wch: 15 }  // Score Interview
+      ];
+      worksheet['!cols'] = columnWidths;
+      
+      // Generate buffer
+      const excelBuffer = XLSX.write(workbook, { 
+        type: 'buffer', 
+        bookType: 'xlsx',
+        cellStyles: true
+      });
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="users_export_${new Date().toISOString().split('T')[0]}.xlsx"`);
+      res.send(excelBuffer);
+    }
+  } catch (error) {
+    console.error('Error exporting users:', error);
+    res.status(500).json({ message: "Error exporting users data" });
   }
 });
 

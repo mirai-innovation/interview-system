@@ -510,7 +510,68 @@ const AdminPanel = () => {
         {/* Tabla de Usuarios - Contenedor de Cristal */}
         <div className="glass-card p-4 sm:p-6 md:p-8 mb-6 sm:mb-8">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 sm:mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Users</h2>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Users</h2>
+              {/* Download Button */}
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    try {
+                      const response = await api.get('/admin/export-users?format=xlsx', {
+                        responseType: 'blob'
+                      });
+                      const url = window.URL.createObjectURL(new Blob([response.data]));
+                      const link = document.createElement('a');
+                      const fileName = `users_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+                      link.href = url;
+                      link.setAttribute('download', fileName);
+                      document.body.appendChild(link);
+                      link.click();
+                      link.remove();
+                      window.URL.revokeObjectURL(url);
+                    } catch (error) {
+                      console.error('Error downloading file:', error);
+                      alert('Error downloading file. Please try again.');
+                    }
+                  }}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow-lg hover:shadow-xl flex items-center gap-2 text-sm"
+                  title="Download as Excel"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Excel
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const response = await api.get('/admin/export-users?format=csv', {
+                        responseType: 'blob'
+                      });
+                      const url = window.URL.createObjectURL(new Blob([response.data]));
+                      const link = document.createElement('a');
+                      const fileName = `users_export_${new Date().toISOString().split('T')[0]}.csv`;
+                      link.href = url;
+                      link.setAttribute('download', fileName);
+                      document.body.appendChild(link);
+                      link.click();
+                      link.remove();
+                      window.URL.revokeObjectURL(url);
+                    } catch (error) {
+                      console.error('Error downloading file:', error);
+                      alert('Error downloading file. Please try again.');
+                    }
+                  }}
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow-lg hover:shadow-xl flex items-center gap-2 text-sm"
+                  title="Download as CSV"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  CSV
+                </button>
+              </div>
+            </div>
             
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
