@@ -21,9 +21,19 @@ const AdminPanel = () => {
 
   const fetchUsers = async () => {
     try {
+      setLoading(true);
+      // Solicitar todos los usuarios sin límite de paginación
       const response = await api.get('/admin/users');
-      setUsers(response.data.users);
+      if (response.data && response.data.users) {
+        setUsers(response.data.users);
+      } else {
+        console.error('Unexpected response format:', response.data);
+        alert('Error: Formato de respuesta inesperado. Por favor, revisa la consola.');
+      }
     } catch (error) {
+      console.error('Error fetching users:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Error desconocido al obtener usuarios';
+      alert(`Error al cargar usuarios: ${errorMessage}\n\nPor favor, verifica:\n1. Que estés autenticado como admin\n2. Que la base de datos esté conectada\n3. Revisa la consola para más detalles`);
     } finally {
       setLoading(false);
     }

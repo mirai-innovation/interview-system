@@ -1,4 +1,5 @@
 import express from "express";
+import mongoose from "mongoose";
 import User from "../models/User.js";
 import Application from "../models/Application.js";
 import { authMiddleware } from "./authRoutes.js";
@@ -13,7 +14,17 @@ router.use(adminMiddleware);
 // Listar usuarios
 router.get("/users", async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = "", role = "", isActive = "" } = req.query;
+    console.log('GET /admin/users - Iniciando consulta de usuarios');
+    
+    // Verificar conexión a la base de datos
+    if (mongoose.connection.readyState !== 1) {
+      console.error('MongoDB no está conectado. Estado:', mongoose.connection.readyState);
+      return res.status(500).json({ 
+        message: "Error de conexión a la base de datos. Por favor, verifica la configuración de MongoDB." 
+      });
+    }
+
+    const { page = 1, limit, search = "", role = "", isActive = "" } = req.query;
     
     const query = {};
     if (search) {
@@ -25,21 +36,36 @@ router.get("/users", async (req, res) => {
     if (role) query.role = role;
     if (isActive !== "") query.isActive = isActive === "true";
 
-    const users = await User.find(query)
-      .select("-password")
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ createdAt: -1 });
+    console.log('Query de búsqueda:', JSON.stringify(query));
 
     const total = await User.countDocuments(query);
+    console.log(`Total de usuarios encontrados: ${total}`);
+
+    // Si no se especifica límite, devolver todos los usuarios
+    let users;
+    if (limit) {
+      users = await User.find(query)
+        .select("-password")
+        .limit(limit * 1)
+        .skip((page - 1) * limit)
+        .sort({ createdAt: -1 });
+    } else {
+      // Sin límite, devolver todos
+      users = await User.find(query)
+        .select("-password")
+        .sort({ createdAt: -1 });
+    }
+
+    console.log(`Usuarios obtenidos: ${users.length}`);
 
     res.json({
       users,
-      totalPages: Math.ceil(total / limit),
+      totalPages: limit ? Math.ceil(total / limit) : 1,
       currentPage: page,
       total
     });
   } catch (error) {
+    console.error('Error fetching users:', error);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 });
