@@ -18,7 +18,7 @@ import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 dotenv.config();
@@ -30,11 +30,11 @@ const __dirname = path.dirname(__filename);
 const router = express.Router();
 
 // Helper function to transcribe and respond
-async function transcribeAndRespond(filePathToTranscribe, tempFilePath, req, res) {
+async function transcribeAndRespond(filePathToTranscribe, tempFilePath, req, res, language = 'en') {
   try {
     let transcription;
     try {
-      transcription = await transcribeVideoAudio(filePathToTranscribe);
+      transcription = await transcribeVideoAudio(filePathToTranscribe, language);
     } catch (transcriptionError) {
       throw transcriptionError;
     }
@@ -310,6 +310,7 @@ router.post("/transcribe-video", authMiddleware, async (req, res) => {
   let tempFilePath = null;
   let filePathToTranscribe = null;
   let s3Url = null;
+  const language = req.body.language || 'en'; // Get language from request, default to 'en'
   
   try {
     // Check if we have an S3 URL (direct upload) or a file upload
@@ -413,11 +414,14 @@ router.post("/transcribe-video", authMiddleware, async (req, res) => {
         return res.status(400).json({ message: "Video file is too small. Please ensure the recording contains audio." });
       }
       
-      if (stats.size > 50 * 1024 * 1024) {
+      // Allow up to 150MB when using S3 direct upload
+      const MAX_FILE_SIZE = VIDEO_STORAGE_TYPE === 's3' ? 150 * 1024 * 1024 : 50 * 1024 * 1024;
+      if (stats.size > MAX_FILE_SIZE) {
         if (tempFilePath && fs.existsSync(tempFilePath)) {
           fs.unlinkSync(tempFilePath);
         }
-        return res.status(400).json({ message: "Video file is too large. Maximum size is 50MB." });
+        const maxSizeMB = VIDEO_STORAGE_TYPE === 's3' ? '150MB' : '50MB';
+        return res.status(400).json({ message: `Video file is too large. Maximum size is ${maxSizeMB}.` });
       }
     } else {
       // Traditional file upload path - handle with multer
@@ -436,8 +440,11 @@ router.post("/transcribe-video", authMiddleware, async (req, res) => {
             return res.status(400).json({ message: "Video file is too small. Please ensure the recording contains audio." });
           }
           
-          if (req.file.size > 50 * 1024 * 1024) {
-            return res.status(400).json({ message: "Video file is too large. Maximum size is 50MB." });
+          // Allow up to 150MB when using S3 storage
+          const MAX_FILE_SIZE = VIDEO_STORAGE_TYPE === 's3' ? 150 * 1024 * 1024 : 50 * 1024 * 1024;
+          if (req.file.size > MAX_FILE_SIZE) {
+            const maxSizeMB = VIDEO_STORAGE_TYPE === 's3' ? '150MB' : '50MB';
+            return res.status(400).json({ message: `Video file is too large. Maximum size is ${maxSizeMB}.` });
           }
           
           // Determine file path based on storage type
@@ -497,7 +504,7 @@ router.post("/transcribe-video", authMiddleware, async (req, res) => {
           
           // Continue with transcription
           try {
-            await transcribeAndRespond(filePathToTranscribe, tempFilePath, req, res);
+            await transcribeAndRespond(filePathToTranscribe, tempFilePath, req, res, language);
             resolve();
           } catch (error) {
             reject(error);
@@ -508,7 +515,7 @@ router.post("/transcribe-video", authMiddleware, async (req, res) => {
     }
 
     // Transcribe using the file path we have
-    await transcribeAndRespond(filePathToTranscribe, tempFilePath, req, res);
+    await transcribeAndRespond(filePathToTranscribe, tempFilePath, req, res, language);
   } catch (error) {
     // Try to delete temp file even on error
     if (tempFilePath && fs.existsSync(tempFilePath)) {
@@ -604,6 +611,11 @@ async function processSubmitInterview(req, res, videoFile, s3VideoUrl, videoTran
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Block if interview is already completed
+    if (user.interviewCompleted) {
+      return res.status(403).json({ message: "Interview has already been completed. You cannot submit again." });
+    }
+
     const { answers } = req.body;
 
     // Parse answers if it's a string (from FormData)
@@ -620,11 +632,15 @@ async function processSubmitInterview(req, res, videoFile, s3VideoUrl, videoTran
       return res.status(400).json({ message: "No valid answers were submitted" });
     }
 
-    // Default questions
-    const defaultQuestions = [
-      "What is your motivation for applying to this program and joining Mirai Innovation Research Institute?",
-      "What is your plan to finance your tuition, travel expenses, and accommodation during your stay in Japan?"
-    ];
+    // Default questions - last question changes based on program
+    const firstQuestion = "What is your motivation for applying to this program and joining Mirai Innovation Research Institute?";
+    let lastQuestion;
+    if (user.program === 'FUTURE_INNOVATORS_JAPAN') {
+      lastQuestion = "Why do you deserve to be awarded this scholarship?";
+    } else {
+      lastQuestion = "What is your plan to finance your tuition, travel expenses, and accommodation during your stay in Japan?";
+    }
+    const defaultQuestions = [firstQuestion, lastQuestion];
 
     const generatedQuestions = user.questions || [];
     const allQuestions = [...generatedQuestions, ...defaultQuestions];
@@ -640,7 +656,7 @@ async function processSubmitInterview(req, res, videoFile, s3VideoUrl, videoTran
     }
 
     // Evaluate text answers only (not the video)
-    const { total_score, evaluations } = await calculateScoreBasedOnAnswers(allQuestions, textAnswers);
+    const { total_score, evaluations, recommendations } = await calculateScoreBasedOnAnswers(allQuestions, textAnswers);
 
     user.interviewResponses = textAnswers;
     
@@ -666,6 +682,7 @@ async function processSubmitInterview(req, res, videoFile, s3VideoUrl, videoTran
     }
     user.interviewScore = total_score;
     user.interviewAnalysis = evaluations;
+    user.interviewRecommendations = recommendations || "";
     user.interviewCompleted = true;
 
     await user.save();
@@ -729,21 +746,27 @@ router.post("/save-interview-progress", authMiddleware, async (req, res) => {
 
     const { answers, currentQuestionIndex, s3VideoUrl, videoTranscription } = req.body;
 
-    // Don't save if interview is already completed
+    // Don't save if interview is already completed - block access
     if (user.interviewCompleted) {
-      return res.json({ message: "Interview already completed" });
+      return res.status(403).json({ message: "Interview has already been completed. You cannot make changes." });
     }
 
     // Save answers temporarily (don't mark as completed)
     user.interviewResponses = answers || [];
     
-    // Save video if provided (for presentation video)
-    if (s3VideoUrl) {
+    // Handle video (for presentation video)
+    // If s3VideoUrl is explicitly null, clear the video (retake scenario)
+    if (s3VideoUrl === null && currentQuestionIndex === 0) {
+      user.interviewVideo = undefined;
+      user.interviewVideoTranscription = undefined;
+    } else if (s3VideoUrl) {
+      // Save video if provided
       user.interviewVideo = s3VideoUrl;
-      if (videoTranscription) {
+      if (videoTranscription !== undefined) {
         user.interviewVideoTranscription = videoTranscription;
       }
     }
+    // If s3VideoUrl is not provided and not null, keep existing video (don't modify)
     
     await user.save();
 
@@ -753,6 +776,274 @@ router.post("/save-interview-progress", authMiddleware, async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ message: "Error saving progress" });
+  }
+});
+
+// Retake interview - Save reason and reset interview data
+router.post("/retake-interview", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { reason } = req.body;
+
+    if (!reason || reason.trim() === '') {
+      return res.status(400).json({ message: "Reason is required" });
+    }
+
+    // Save retake reason
+    user.retakeReason = reason.trim();
+
+    // Reset interview data
+    user.interviewResponses = [];
+    user.interviewVideo = undefined;
+    user.interviewVideoTranscription = undefined;
+    user.interviewScore = undefined;
+    user.interviewAnalysis = [];
+    user.interviewRecommendations = undefined;
+    user.interviewCompleted = false;
+
+    await user.save();
+
+    return res.json({ 
+      message: "Interview reset successfully. You can now retake the interview.",
+      retakeReason: user.retakeReason
+    });
+  } catch (error) {
+    console.error('Error in retake-interview:', error);
+    return res.status(500).json({ message: "Error resetting interview" });
+  }
+});
+
+// Reset all data (CV + Interview) - Complete reset for retaking everything
+router.post("/reset-all", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Delete CV file if exists (local storage)
+    if (user.cvPath && STORAGE_TYPE === 'local') {
+      try {
+        const fileName = path.basename(user.cvPath);
+        const filePath = path.join(__dirname, '../uploads/cvs', fileName);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (fileError) {
+        console.error('Error deleting CV file:', fileError);
+        // Continue even if file deletion fails
+      }
+    }
+
+    // Reset all CV data
+    user.cvPath = undefined;
+    user.cvText = undefined;
+    user.analysis = undefined;
+    user.skills = [];
+    user.questions = [];
+    user.score = undefined;
+    user.cvAnalyzed = false;
+
+    // Reset all interview data
+    user.interviewResponses = [];
+    user.interviewVideo = undefined;
+    user.interviewVideoTranscription = undefined;
+    user.interviewScore = undefined;
+    user.interviewAnalysis = [];
+    user.interviewRecommendations = undefined;
+    user.interviewCompleted = false;
+
+    // Clear retake reason (optional, can keep it for tracking)
+    // user.retakeReason = undefined;
+
+    await user.save();
+
+    return res.json({ 
+      message: "All data reset successfully. You can now start fresh with CV upload and interview."
+    });
+  } catch (error) {
+    console.error('Error in reset-all:', error);
+    return res.status(500).json({ message: "Error resetting data" });
+  }
+});
+
+// Reset only interview data (keep CV) - For retaking interview from Results page
+router.post("/reset-interview-only", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Only reset interview data, keep CV intact
+    user.interviewResponses = [];
+    user.interviewVideo = undefined;
+    user.interviewVideoTranscription = undefined;
+    user.interviewScore = undefined;
+    user.interviewAnalysis = [];
+    user.interviewRecommendations = undefined;
+    user.interviewCompleted = false;
+
+    await user.save();
+
+    return res.json({ 
+      message: "Interview data reset successfully. You can now retake the interview."
+    });
+  } catch (error) {
+    console.error('Error in reset-interview-only:', error);
+    return res.status(500).json({ message: "Error resetting interview data" });
+  }
+});
+
+// Report problem or submit survey/feedback
+router.post("/report", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { type, subject, message } = req.body;
+
+    if (!type || !['problem', 'survey', 'feedback'].includes(type)) {
+      return res.status(400).json({ message: "Invalid report type. Must be 'problem', 'survey', or 'feedback'" });
+    }
+
+    if (!message || message.trim() === '') {
+      return res.status(400).json({ message: "Message is required" });
+    }
+
+    // Initialize reports array if it doesn't exist
+    if (!user.reports) {
+      user.reports = [];
+    }
+
+    // Add new report with initial message
+    user.reports.push({
+      type: type,
+      subject: subject || '',
+      message: message.trim(),
+      submittedAt: new Date(),
+      messages: [{
+        sender: 'user',
+        message: message.trim(),
+        sentAt: new Date()
+      }]
+    });
+
+    await user.save();
+
+    return res.json({ 
+      message: "Report submitted successfully. Thank you for your feedback!",
+      report: user.reports[user.reports.length - 1]
+    });
+  } catch (error) {
+    console.error('Error in report:', error);
+    return res.status(500).json({ message: "Error submitting report" });
+  }
+});
+
+// Get user reports
+router.get("/reports", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.json({
+      reports: user.reports || []
+    });
+  } catch (error) {
+    console.error('Error fetching reports:', error);
+    return res.status(500).json({ message: "Error fetching reports" });
+  }
+});
+
+// User respond to their own report
+router.post("/reports/:reportIndex/respond", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { reportIndex } = req.params;
+    const { message } = req.body;
+
+    if (!message || message.trim() === '') {
+      return res.status(400).json({ message: "Message is required" });
+    }
+
+    if (!user.reports || !Array.isArray(user.reports) || user.reports.length === 0) {
+      return res.status(404).json({ message: "User has no reports" });
+    }
+
+    const index = parseInt(reportIndex);
+    if (isNaN(index) || index < 0 || index >= user.reports.length) {
+      return res.status(400).json({ message: "Invalid report index" });
+    }
+
+    const report = user.reports[index];
+    
+    // Initialize messages array if it doesn't exist
+    if (!report.messages) {
+      report.messages = [];
+    }
+
+    // Add user response to messages
+    report.messages.push({
+      sender: 'user',
+      message: message.trim(),
+      sentAt: new Date()
+    });
+
+    await user.save();
+
+    return res.json({
+      message: "Response sent successfully",
+      report: report
+    });
+  } catch (error) {
+    console.error('Error in respond to report:', error);
+    return res.status(500).json({ message: "Error sending response" });
+  }
+});
+
+// Satisfaction survey - Save feedback after interview submission
+router.post("/satisfaction-survey", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { rating, comments } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: "Rating must be between 1 and 5" });
+    }
+
+    // Save satisfaction survey
+    user.satisfactionSurvey = {
+      rating: rating,
+      comments: comments || '',
+      submittedAt: new Date()
+    };
+
+    await user.save();
+
+    return res.json({ 
+      message: "Thank you for your feedback!",
+      satisfactionSurvey: user.satisfactionSurvey
+    });
+  } catch (error) {
+    console.error('Error in satisfaction-survey:', error);
+    return res.status(500).json({ message: "Error submitting survey" });
   }
 });
 
@@ -815,6 +1106,51 @@ router.post("/text-to-speech", authMiddleware, async (req, res) => {
   }
 });
 
+// Get tutorial video URL
+router.get("/tutorial-video-url", authMiddleware, async (req, res) => {
+  try {
+    // Construct S3 URL using the same pattern as other videos
+    const bucketName = process.env.AWS_BUCKET_NAME || 'mirai-interviews';
+    const region = process.env.AWS_REGION || 'us-east-1';
+    const s3Key = 'videos/tutorial.mp4';
+    const tutorialUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${s3Key}`;
+    
+    // Verify the file exists and is accessible (only if using S3)
+    if (VIDEO_STORAGE_TYPE === 's3') {
+      try {
+        const s3Client = new S3Client({
+          region: region,
+          credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+          },
+        });
+        
+        const headCommand = new HeadObjectCommand({
+          Bucket: bucketName,
+          Key: s3Key,
+        });
+        
+        await s3Client.send(headCommand);
+        // File exists, return the URL
+        res.json({ url: tutorialUrl });
+      } catch (s3Error) {
+        // File doesn't exist or not accessible
+        res.status(404).json({ 
+          error: 'Tutorial video not found',
+          message: `The tutorial video (${s3Key}) was not found in the S3 bucket. Please ensure the file exists and has public-read permissions.`,
+          url: tutorialUrl // Still return the URL so frontend can try
+        });
+      }
+    } else {
+      // Local storage - return the URL
+      res.json({ url: tutorialUrl });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error", error: error.message });
+  }
+});
+
 // Obtener respuestas de entrevista
 router.get("/interview-responses", authMiddleware, async (req, res) => {
   try {
@@ -827,11 +1163,15 @@ router.get("/interview-responses", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Interview not completed" });
     }
 
-    // Default questions
-    const defaultQuestions = [
-      "What is your motivation for applying to this program and joining Mirai Innovation Research Institute?",
-      "What is your plan to finance your tuition, travel expenses, and accommodation during your stay in Japan?"
-    ];
+    // Default questions - last question changes based on program
+    const firstQuestion = "What is your motivation for applying to this program and joining Mirai Innovation Research Institute?";
+    let lastQuestion;
+    if (user.program === 'FUTURE_INNOVATORS_JAPAN') {
+      lastQuestion = "Why do you deserve to be awarded this scholarship?";
+    } else {
+      lastQuestion = "What is your plan to finance your tuition, travel expenses, and accommodation during your stay in Japan?";
+    }
+    const defaultQuestions = [firstQuestion, lastQuestion];
 
     const allQuestions = [...(user.questions || []), ...defaultQuestions];
 
@@ -841,7 +1181,8 @@ router.get("/interview-responses", authMiddleware, async (req, res) => {
       responses: user.interviewResponses || [],
       video: user.interviewVideo || null,
       videoTranscription: user.interviewVideoTranscription || null,
-      analysis: user.interviewAnalysis || []
+      analysis: user.interviewAnalysis || [],
+      recommendations: user.interviewRecommendations || null
     };
 
     // Solo incluir el score si el usuario es admin

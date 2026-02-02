@@ -44,14 +44,51 @@ router.post("/register", async (req, res) => {
     const { name, email, password, dob, gender, academic_level, program } = req.body;
 
     if (!name || !email || !password || !dob || !gender || !academic_level || !program) {
-      return res.status(400).json({ message: "Faltan campos requeridos." });
+      return res.status(400).json({ message: "Missing required fields." });
+    }
+
+    // Validate age requirement (must be at least 17 years old)
+    const birthDate = new Date(dob);
+    const today = new Date();
+    
+    // Validate date is valid
+    if (isNaN(birthDate.getTime())) {
+      return res.status(400).json({ message: "Invalid date of birth. Please enter a valid date." });
+    }
+    
+    // Validate date is not in the future
+    if (birthDate > today) {
+      return res.status(400).json({ message: "Date of birth cannot be in the future." });
+    }
+    
+    // Validate date is reasonable (not before 1900)
+    const minYear = 1900;
+    if (birthDate.getFullYear() < minYear) {
+      return res.status(400).json({ message: "Date of birth must be after 1900." });
+    }
+    
+    // Calculate age
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    // Validate age is reasonable (not more than 120 years)
+    if (age > 120) {
+      return res.status(400).json({ message: "Please enter a valid date of birth." });
+    }
+    
+    // Validate age requirement (must be at least 17 years old)
+    if (age < 17) {
+      return res.status(400).json({ message: "You must be at least 17 years old to register." });
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
 
     const exists = await User.findOne({ email: normalizedEmail });
     if (exists) {
-      return res.status(409).json({ message: "El correo ya está registrado." });
+      return res.status(409).json({ message: "Email is already registered." });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -91,17 +128,17 @@ router.post("/register", async (req, res) => {
     const user = await User.create(userData);
 
     return res.status(201).json({ 
-      message: "Usuario registrado con éxito", 
+      message: "User registered successfully", 
       userId: user._id 
     });
   } catch (error) {
     if (error?.name === "ValidationError") {
       return res.status(400).json({ 
-        message: "Datos inválidos", 
+        message: "Invalid data", 
         details: error.errors 
       });
     }
-    return res.status(500).json({ message: "Error en el servidor" });
+    return res.status(500).json({ message: "Server error" });
   }
 });
 

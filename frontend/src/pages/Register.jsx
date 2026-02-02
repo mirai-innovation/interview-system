@@ -17,16 +17,77 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Calculate age from date of birth
+  const calculateAge = (dateOfBirth) => {
+    if (!dateOfBirth) return null;
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    
+    // Validate date is valid
+    if (isNaN(birthDate.getTime())) {
+      return null;
+    }
+    
+    // Validate date is not in the future
+    if (birthDate > today) {
+      return null;
+    }
+    
+    // Validate date is reasonable (not before 1900)
+    const minYear = 1900;
+    if (birthDate.getFullYear() < minYear) {
+      return null;
+    }
+    
+    // Validate date is not too old (not more than 120 years)
+    const maxAge = 120;
+    const minDate = new Date();
+    minDate.setFullYear(today.getFullYear() - maxAge);
+    if (birthDate < minDate) {
+      return null;
+    }
+    
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
     });
+    // Clear error when user changes date of birth
+    if (e.target.name === 'dob' && error) {
+      setError('');
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    
+    // Validate age requirement (must be at least 17 years old)
+    if (formData.dob) {
+      const age = calculateAge(formData.dob);
+      if (age === null) {
+        setError('Please enter a valid date of birth. The date must be between 1900 and today, and you must be at least 17 years old.');
+        return;
+      }
+      if (age < 17) {
+        setError('You must be at least 17 years old to register.');
+        return;
+      }
+      if (age > 120) {
+        setError('Please enter a valid date of birth.');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -171,6 +232,7 @@ const Register = () => {
               <option value="MIRI">MIRI</option>
               <option value="EMFUTECH">EMFUTECH</option>
               <option value="JCTI">JCTI</option>
+              <option value="FUTURE_INNOVATORS_JAPAN">Future Innovators Japan selection entry</option>
               <option value="OTHER">OTHER</option>
             </select>
           </div>

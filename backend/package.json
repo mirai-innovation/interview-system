@@ -10,7 +10,10 @@
     "create-env": "node create-env.js",
     "tunnel": "cloudflared tunnel --url http://localhost:20352",
     "tunnel:dev": "concurrently \"npm run dev\" \"npm run tunnel\"",
-    "tunnel:start": "concurrently \"npm start\" \"npm run tunnel\""
+    "tunnel:start": "concurrently \"npm start\" \"npm run tunnel\"",
+    "generate-recommendations": "node scripts/generateRecommendations.js",
+    "export-user-data": "node scripts/exportUserData.js",
+    "export-missing-users": "node scripts/exportMissingUsers.js"
   },
   "keywords": [
     "evaluation",
@@ -35,7 +38,8 @@
     "multer-s3": "^3.0.1",
     "nodemailer": "^6.9.7",
     "openai": "^4.20.1",
-    "pdf-parse": "^1.1.4"
+    "pdf-parse": "^1.1.4",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

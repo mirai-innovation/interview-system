@@ -6,6 +6,109 @@ import { AuthContext } from '../contexts/AuthContext';
 import cvIcon from '../assets/cv.png';
 import interviewIcon from '../assets/interview.png';
 
+// Función para formatear markdown básico a HTML
+const formatMarkdown = (text) => {
+  if (!text) return '';
+  
+  const lines = text.split('\n');
+  let html = '';
+  let inList = false;
+  let listItems = [];
+  let currentParagraph = [];
+  
+  const closeList = () => {
+    if (inList && listItems.length > 0) {
+      html += '<ul class="list-disc list-inside space-y-1 my-3 ml-4">';
+      listItems.forEach(item => {
+        html += `<li class="mb-1">${item}</li>`;
+      });
+      html += '</ul>';
+      listItems = [];
+      inList = false;
+    }
+  };
+  
+  const closeParagraph = () => {
+    if (currentParagraph.length > 0) {
+      let content = currentParagraph.join(' ').trim();
+      // Procesar negritas
+      content = content.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>');
+      if (content) {
+        html += `<p class="mb-3">${content}</p>`;
+      }
+      currentParagraph = [];
+    }
+  };
+  
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    
+    // Línea vacía - cerrar lista y párrafo
+    if (!trimmed) {
+      closeList();
+      closeParagraph();
+      return;
+    }
+    
+    // Encabezados ###
+    if (trimmed.startsWith('### ')) {
+      closeList();
+      closeParagraph();
+      const content = trimmed.substring(4).trim();
+      html += `<h3 class="text-lg font-bold text-gray-900 mt-4 mb-2">${content}</h3>`;
+      return;
+    }
+    
+    // Encabezados ####
+    if (trimmed.startsWith('#### ')) {
+      closeList();
+      closeParagraph();
+      const content = trimmed.substring(5).trim();
+      html += `<h4 class="text-base font-semibold text-gray-800 mt-3 mb-2">${content}</h4>`;
+      return;
+    }
+    
+    // Lista con -
+    if (trimmed.startsWith('- ')) {
+      closeParagraph();
+      if (!inList) {
+        closeList();
+        inList = true;
+      }
+      let content = trimmed.substring(2).trim();
+      // Procesar negritas dentro de la lista
+      content = content.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>');
+      listItems.push(content);
+      return;
+    }
+    
+    // Lista numerada 1. 2. etc.
+    const numberedMatch = trimmed.match(/^\d+\. (.+)$/);
+    if (numberedMatch) {
+      closeParagraph();
+      if (!inList) {
+        closeList();
+        inList = true;
+      }
+      let content = numberedMatch[1].trim();
+      // Procesar negritas dentro de la lista
+      content = content.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>');
+      listItems.push(content);
+      return;
+    }
+    
+    // Párrafo normal - acumular líneas
+    closeList();
+    currentParagraph.push(trimmed);
+  });
+  
+  // Cerrar lista y párrafo si quedan abiertos al final
+  closeList();
+  closeParagraph();
+  
+  return html;
+};
+
 // Componente de gráfico circular de progreso
 const CircularProgress = ({ percentage, size = 150, color = 'blue' }) => {
   const radius = (size - 20) / 2;
@@ -65,6 +168,9 @@ const Results = () => {
   const [profile, setProfile] = useState(null);
   const [interviewData, setInterviewData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState('');
   const { user } = useContext(AuthContext);
   const isAdmin = user?.role === 'admin';
 
@@ -89,6 +195,26 @@ const Results = () => {
       setInterviewData(response.data);
     } catch (error) {
       // Interview not completed yet, that's okay
+    }
+  };
+
+  const handleResetAll = async () => {
+    setResetting(true);
+    setResetError('');
+    
+    try {
+      // Reset only interview data, keep CV
+      await api.post('/users/reset-interview-only');
+      // Refresh profile data
+      await fetchProfile();
+      await fetchInterviewData();
+      setShowResetConfirm(false);
+      // Redirect to interview page automatically
+      window.location.href = '/interview';
+    } catch (error) {
+      setResetError(error.response?.data?.message || 'Error resetting interview data. Please try again.');
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -279,69 +405,46 @@ const Results = () => {
                   </div>
                 )}
 
-                {/* Questions and Answers */}
-                {interviewData && interviewData.questions && interviewData.responses && (
+                {/* Mensaje de agradecimiento y próximos pasos */}
+                {profile?.interviewCompleted && (
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Questions and Answers</h3>
-                    <div className="space-y-4">
-                      {interviewData.questions.map((question, index) => (
-                        <div key={index} className="bg-gray-50 p-4 rounded-lg border-l-4 border-blue-500">
-                          <p className="font-semibold text-gray-900 mb-2">
-                            {question}
-                          </p>
-                          <p className="text-sm text-gray-700 mb-3">
-                            {interviewData.responses[index] || <span className="text-gray-400">No answer</span>}
-                          </p>
-                          {interviewData.analysis && interviewData.analysis[index] && (
-                            <div className="mt-3 pt-3 border-t border-gray-200">
-                              {typeof interviewData.analysis[index] === 'string' ? (
-                                <p className="text-xs text-gray-600">{interviewData.analysis[index]}</p>
-                              ) : (
-                                <div className="space-y-1">
-                                  {interviewData.analysis[index].explanation && (
-                                    <p className="text-xs text-gray-600">{interviewData.analysis[index].explanation}</p>
-                                  )}
-                                  {isAdmin && interviewData.analysis[index].score !== undefined && (
-                                    <p className="text-xs text-gray-500 font-medium">
-                                      Score: {interviewData.analysis[index].score}%
-                                    </p>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Thank You for Completing Your Interview!</h3>
+                    <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl border-l-4 border-purple-500">
+                      <div className="text-sm text-gray-700 leading-relaxed space-y-3">
+                        <p className="mb-3">
+                          Thank you for completing your interview with <strong className="font-semibold text-gray-900">Mirai Innovation Research Institute</strong>. We appreciate the time and effort you invested in this process.
+                        </p>
+                        <div className="bg-white/60 p-4 rounded-lg border border-purple-200">
+                          <p className="font-semibold text-gray-900 mb-2">📢 Coming Soon:</p>
+                          <ul className="list-disc list-inside space-y-2 ml-2">
+                            <li><strong className="font-semibold">Personalized Recommendations:</strong> Detailed analysis and improvement suggestions based on your interview performance.</li>
+                            <li><strong className="font-semibold">Exclusive Webinars:</strong> Professional development webinars with certificates for all participants, brought to you by Mirai Innovation Research Institute.</li>
+                          </ul>
                         </div>
-                      ))}
+                        <p className="mt-3 text-gray-600 italic">
+                          Please stay tuned for updates! We will notify you via email when these resources become available.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* Interview Analysis */}
-                {interviewAnalysis.length > 0 && !interviewData && (
+                {/* Interview Analysis and Recommendations - COMENTADO TEMPORALMENTE */}
+                {/* 
+                {(interviewData?.recommendations || profile?.interviewRecommendations) && (
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Detailed Analysis</h3>
-                    <div className="space-y-3">
-                      {interviewAnalysis.map((analysis, index) => (
-                        <div key={index} className="bg-gray-50 p-4 rounded-lg border-l-4 border-purple-500">
-                          {typeof analysis === 'string' ? (
-                            <p className="text-sm text-gray-700">{analysis}</p>
-                          ) : (
-                            <div className="space-y-2">
-                              {analysis.explanation && (
-                                <p className="text-sm text-gray-700">{analysis.explanation}</p>
-                              )}
-                              {isAdmin && analysis.score !== undefined && (
-                                <p className="text-xs text-gray-500 font-medium">
-                                  Score: {analysis.score}%
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Performance Analysis & Recommendations</h3>
+                    <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl border-l-4 border-purple-500">
+                      <div 
+                        className="text-sm text-gray-700 leading-relaxed"
+                        dangerouslySetInnerHTML={{ 
+                          __html: formatMarkdown(interviewData?.recommendations || profile?.interviewRecommendations) 
+                        }}
+                      />
                     </div>
                   </div>
                 )}
+                */}
 
                 {/* Video Link */}
                 {profile?.interviewVideo && (
@@ -357,7 +460,7 @@ const Results = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      Watch Interview Video
+                      Watch Self-Introduction Video
                     </a>
                   </div>
                 )}
@@ -435,28 +538,43 @@ const Results = () => {
                       </p>
                     </div>
                   )}
-                  <div className="flex gap-3">
-                    <Link
-                      to="/dashboard"
-                      className="flex-1 text-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-4 rounded-lg transition-all duration-300"
-                    >
-                      Back to Dashboard
-                    </Link>
-                    {!profile?.cvAnalyzed && (
+                  <div className="space-y-3">
+                    <div className="flex gap-3">
                       <Link
-                        to="/cv-upload"
-                        className="flex-1 text-center bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+                        to="/dashboard"
+                        className="flex-1 text-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-4 rounded-lg transition-all duration-300"
                       >
-                        Upload CV
+                        Back to Dashboard
                       </Link>
-                    )}
-                    {profile?.cvAnalyzed && !profile?.interviewCompleted && (
-                      <Link
-                        to="/interview"
-                        className="flex-1 text-center bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+                      {!profile?.cvAnalyzed && (
+                        <Link
+                          to="/cv-upload"
+                          className="flex-1 text-center bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+                        >
+                          Upload CV
+                        </Link>
+                      )}
+                      {profile?.cvAnalyzed && !profile?.interviewCompleted && (
+                        <Link
+                          to="/interview"
+                          className="flex-1 text-center bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+                        >
+                          Start Interview
+                        </Link>
+                      )}
+                    </div>
+                    
+                    {/* Retake Interview Button - Show only if both CV and Interview are completed */}
+                    {profile?.cvAnalyzed && profile?.interviewCompleted && (
+                      <button
+                        onClick={() => setShowResetConfirm(true)}
+                        className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
                       >
-                        Start Interview
-                      </Link>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Retake Interview
+                      </button>
                     )}
                   </div>
                 </div>
@@ -465,6 +583,54 @@ const Results = () => {
           )}
         </div>
       </div>
+
+      {/* Reset Confirmation Modal */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="glass-card bg-white/90 backdrop-blur-xl border border-white/40 rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Retake Interview</h2>
+            <p className="text-gray-600 mb-4">
+              Are you sure you want to retake the interview? This will reset:
+            </p>
+            <ul className="list-disc list-inside text-gray-600 mb-6 space-y-2">
+              <li>All interview responses</li>
+              <li>Interview video and transcription</li>
+              <li>Interview scores and analysis</li>
+            </ul>
+            
+            <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6 rounded">
+              <p className="text-blue-800 text-sm font-semibold">ℹ️ Note</p>
+              <p className="text-blue-700 text-sm">Your CV and CV analysis will be kept. You will be redirected to start the interview again.</p>
+            </div>
+
+            {resetError && (
+              <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                {resetError}
+              </div>
+            )}
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => {
+                  setShowResetConfirm(false);
+                  setResetError('');
+                }}
+                disabled={resetting}
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl px-6 py-3 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResetAll}
+                disabled={resetting}
+                className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white rounded-xl px-6 py-3 font-bold shadow-xl hover:shadow-2xl transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {resetting ? 'Resetting...' : 'Confirm Reset'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
