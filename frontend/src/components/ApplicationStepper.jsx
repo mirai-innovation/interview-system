@@ -39,7 +39,7 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
       description: 'Download your acceptance letter (available after admin generates it)',
       route: null,
       completed: step4Completed,
-      available: step3Completed && !!acceptanceLetterGeneratedAt,
+      available: !!acceptanceLetterGeneratedAt,
     },
   ];
 
