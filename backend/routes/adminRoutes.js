@@ -690,9 +690,9 @@ router.post("/users/:userId/acceptance-letter/notify", async (req, res) => {
         ? `${application.firstName} ${application.lastName}`
         : user.name;
 
-    const dashboardUrl = process.env.FRONTEND_URL
-      ? `${process.env.FRONTEND_URL.replace(/\/$/, "")}/dashboard`
-      : "";
+    // Use student portal URL for acceptance email so users always land on https://studentportal.mirai-education.tech
+    const studentPortalBase = (process.env.STUDENT_PORTAL_URL || process.env.FRONTEND_URL || "https://studentportal.mirai-education.tech").replace(/\/$/, "");
+    const dashboardUrl = `${studentPortalBase}/dashboard`;
 
     const emailResult = await sendAcceptanceLetterReadyNotification(
       user.email,
@@ -724,9 +724,9 @@ router.post("/acceptance-letter/notify-bulk", async (req, res) => {
       return res.status(400).json({ message: "userIds array is required and must not be empty." });
     }
 
-    const dashboardUrl = process.env.FRONTEND_URL
-      ? `${process.env.FRONTEND_URL.replace(/\/$/, "")}/dashboard`
-      : "";
+    // Use student portal URL for acceptance email so users always land on https://studentportal.mirai-education.tech
+    const studentPortalBase = (process.env.STUDENT_PORTAL_URL || process.env.FRONTEND_URL || "https://studentportal.mirai-education.tech").replace(/\/$/, "");
+    const dashboardUrl = `${studentPortalBase}/dashboard`;
 
     const results = [];
     let sent = 0;

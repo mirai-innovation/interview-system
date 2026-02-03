@@ -681,7 +681,9 @@ export const sendAcceptanceLetterReadyNotification = async (userEmail, userName,
     await transporter.verify();
 
     const safeUserName = escapeHtml(userName || 'Applicant');
-    const safeDashboardUrl = escapeHtml(dashboardUrl || process.env.FRONTEND_URL || '');
+    const portalBase = process.env.STUDENT_PORTAL_URL || process.env.FRONTEND_URL || 'https://studentportal.mirai-education.tech';
+    const finalDashboardUrl = (dashboardUrl || `${portalBase.replace(/\/$/, '')}/dashboard`).trim();
+    const safeDashboardUrl = escapeHtml(finalDashboardUrl);
 
     const textVersion = `Mirai Innovation Research Institute - Your Acceptance Letter is Ready
 
@@ -691,7 +693,7 @@ Your official acceptance letter for the Mirai Innovation Research Immersion Prog
 
 You can download your acceptance letter PDF from your dashboard:
 
-${dashboardUrl || '(Log in to the evaluation system and go to your Dashboard)'}
+${finalDashboardUrl || '(Log in to the evaluation system and go to your Dashboard)'}
 
 Log in to your account and you will see the "Acceptance Letter" step with a "Download PDF" button.
 
@@ -744,7 +746,7 @@ Evaluation Committee`;
                 Log in to your account and go to your <strong>Dashboard</strong>. You will see the &quot;Acceptance Letter&quot; step with a <strong>Download PDF</strong> button to get your letter.
               </p>
               <div style="text-align: center; margin-top: 30px;">
-                <a href="${dashboardUrl || (process.env.FRONTEND_URL || '')}" style="display: inline-block; padding: 14px 32px; background-color: #059669; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2);">
+                <a href="${finalDashboardUrl}" style="display: inline-block; padding: 14px 32px; background-color: #059669; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2);">
                   Go to Dashboard &amp; Download
                 </a>
               </div>
