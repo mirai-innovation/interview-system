@@ -1,11 +1,51 @@
-import { useState, useEffect, useRef, useContext } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../utils/axios';
-import { AuthContext } from '../contexts/AuthContext';
 import ApplicationStepper from '../components/ApplicationStepper';
-import cvIcon from '../assets/cv.png';
-import interviewIcon from '../assets/interview.png';
+
+// Circular progress (same style as main / Results)
+const CircularProgress = ({ percentage, size = 120, color = 'blue' }) => {
+  const radius = (size - 20) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percentage / 100) * circumference;
+  const gradientColors = {
+    blue: { from: '#3B82F6', to: '#8B5CF6' },
+    green: { from: '#10B981', to: '#3B82F6' },
+    purple: { from: '#8B5CF6', to: '#EC4899' },
+  };
+  const colors = gradientColors[color] || gradientColors.blue;
+  return (
+    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="transform -rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={radius} stroke="rgba(255, 255, 255, 0.2)" strokeWidth="12" fill="none" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={`url(#gradient-dash-${color})`}
+          strokeWidth="12"
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className="transition-all duration-1000 ease-out"
+        />
+        <defs>
+          <linearGradient id={`gradient-dash-${color}`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={colors.from} />
+            <stop offset="100%" stopColor={colors.to} />
+          </linearGradient>
+        </defs>
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          {percentage}%
+        </span>
+      </div>
+    </div>
+  );
+};
 
 const Dashboard = () => {
   const [applicationStatus, setApplicationStatus] = useState(null);
@@ -108,10 +148,38 @@ const Dashboard = () => {
       
       <Navbar />
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-7xl">
-        {/* Application Stepper - Main Hero Element */}
-        <div className="mb-6 sm:mb-8">
+        {/* Your Journey card: circle progress + Application Progress (space of CV + Interview), View summary button below */}
+        <div className="glass-card p-4 sm:p-6 mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-6 mb-6">
+            <div className="flex items-center gap-4">
+              <CircularProgress
+                percentage={applicationStatus ? Math.round(([applicationStatus.step1Completed, applicationStatus.step2Completed, applicationStatus.step3Completed, applicationStatus.step4Completed].filter(Boolean).length / 4) * 100) : 0}
+                size={120}
+                color="blue"
+              />
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Your journey</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {applicationStatus ? `${[applicationStatus.step1Completed, applicationStatus.step2Completed, applicationStatus.step3Completed, applicationStatus.step4Completed].filter(Boolean).length} / 4 steps completed` : '0 / 4 steps completed'}
+                </p>
+              </div>
+            </div>
+          </div>
           <ApplicationStepper applicationStatus={applicationStatus} onDownloadAcceptanceLetterSuccess={fetchApplicationStatus} />
         </div>
+
+        {/* View summary - elemento separado, mismo ancho que Your journey (estilo main: azul, letras blancas, icono Results) */}
+        <Link
+          to="/results"
+          className="block w-full mb-6 sm:mb-8 p-4 sm:p-6 text-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
+        >
+          <span className="inline-flex items-center justify-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            View summary
+          </span>
+        </Link>
 
         {/* Profile Card - Full Width */}
         <div className="glass-card p-4 sm:p-6">
