@@ -2,6 +2,7 @@ import express from "express";
 import Application from "../models/Application.js";
 import User from "../models/User.js";
 import { authMiddleware } from "./authRoutes.js";
+import { streamAcceptanceLetterPdf } from "../utils/acceptanceLetterPdf.js";
 
 const router = express.Router();
 
@@ -18,6 +19,7 @@ router.get("/status", authMiddleware, async (req, res) => {
         step2Completed: false,
         step3Completed: false,
         step4Completed: false,
+        acceptanceLetterGeneratedAt: null,
       });
     }
 
@@ -28,6 +30,7 @@ router.get("/status", authMiddleware, async (req, res) => {
       step2Completed: application.step2Completed,
       step3Completed: application.step3Completed,
       step4Completed: application.step4Completed,
+      acceptanceLetterGeneratedAt: application.acceptanceLetterGeneratedAt || null,
       isDraft: application.isDraft,
       lastSavedAt: application.lastSavedAt,
       scheduledMeeting: application.scheduledMeeting || null,
@@ -194,6 +197,37 @@ router.put("/submit", authMiddleware, async (req, res) => {
       message: "Error submitting application", 
       error: error.message 
     });
+  }
+});
+
+// Download acceptance letter (user) - available when admin has generated it (no screening/application steps required).
+router.get("/acceptance-letter", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const application = await Application.findOne({ userId: req.userId });
+    if (!application) {
+      return res.status(403).json({
+        message: "Acceptance letter is not available yet. The admin has not generated your letter.",
+      });
+    }
+    if (!application.acceptanceLetterGeneratedAt) {
+      return res.status(403).json({
+        message: "Acceptance letter is not available yet. The admin has not generated your letter.",
+      });
+    }
+
+    // Mark step 4 as completed when user downloads (if step4Completed exists on application)
+    if (application.step4Completed === false) {
+      application.step4Completed = true;
+      await application.save();
+    }
+
+    streamAcceptanceLetterPdf(res, user, application);
+  } catch (error) {
+    console.error("Error downloading acceptance letter:", error);
+    res.status(500).json({ message: "Error downloading acceptance letter" });
   }
 });
 

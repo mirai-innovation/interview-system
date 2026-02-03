@@ -1,48 +1,84 @@
 import { Link } from 'react-router-dom';
+import api from '../utils/axios';
 
-const ApplicationStepper = ({ applicationStatus }) => {
+const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSuccess }) => {
+  const step1Completed = applicationStatus?.step1Completed || false;
+  const step2Completed = applicationStatus?.step2Completed || false;
+  const step3Completed = applicationStatus?.step3Completed || false;
+  const step4Completed = applicationStatus?.step4Completed || false;
+  const acceptanceLetterGeneratedAt = applicationStatus?.acceptanceLetterGeneratedAt;
+
   const steps = [
     {
       id: 1,
       title: 'Application Form',
       description: 'Complete your personal and academic information',
       route: '/application-form',
-      completed: applicationStatus?.step1Completed || false,
-      available: true, // Always available
+      completed: step1Completed,
+      available: true,
     },
     {
       id: 2,
       title: 'AI Interview',
       description: 'Answer personalized interview questions',
       route: '/interview',
-      completed: applicationStatus?.step2Completed || false,
-      available: applicationStatus?.step1Completed || false, // Available after step 1
+      completed: step2Completed,
+      available: step1Completed,
     },
     {
       id: 3,
       title: 'Schedule Screening',
       description: 'Schedule your screening interview',
       route: '/schedule-screening',
-      completed: applicationStatus?.step3Completed || false,
-      // In development: allow after step 1, in production: require step 2
-      // Check if we're in development mode or if the env var is explicitly set to true
-      // In Vite, use import.meta.env instead of process.env
-      // import.meta.env.MODE is 'development' in dev mode, 'production' in production
-      available: (import.meta.env.MODE === 'development' || import.meta.env.VITE_ENABLE_SCHEDULE_WITHOUT_INTERVIEW === 'true'
-        ? (applicationStatus?.step1Completed || false) 
-        : (applicationStatus?.step2Completed || false)),
+      completed: step3Completed,
+      available: step2Completed,
     },
     {
       id: 4,
       title: 'Acceptance Letter',
-      description: 'View your acceptance decision',
-      route: '#',
-      completed: applicationStatus?.step4Completed || false,
-      available: applicationStatus?.step3Completed || false, // Available after step 3
+      description: 'Download your acceptance letter (available after admin generates it)',
+      route: null,
+      completed: step4Completed,
+      available: step3Completed && !!acceptanceLetterGeneratedAt,
     },
   ];
 
   const currentStep = applicationStatus?.currentStep || 1;
+
+  const handleDownloadAcceptanceLetter = async () => {
+    try {
+      const response = await api.get('/application/acceptance-letter', {
+        responseType: 'blob',
+      });
+      const disposition = response.headers['content-disposition'];
+      const fileNameMatch = disposition?.match(/filename="?([^"]+)"?/);
+      const fileName = fileNameMatch?.[1] || 'Acceptance_Letter.pdf';
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      if (typeof onDownloadAcceptanceLetterSuccess === 'function') {
+        onDownloadAcceptanceLetterSuccess();
+      }
+    } catch (error) {
+      if (error.response?.data instanceof Blob) {
+        error.response.data.text().then((text) => {
+          try {
+            const jsonError = JSON.parse(text);
+            alert(jsonError.message || 'Error downloading letter.');
+          } catch {
+            alert('Error downloading acceptance letter.');
+          }
+        });
+      } else {
+        alert(error.response?.data?.message || 'Error downloading acceptance letter.');
+      }
+    }
+  };
 
   return (
     <div className="glass-card bg-white/60 backdrop-blur-xl border border-white/40 rounded-3xl p-6 sm:p-8 shadow-2xl">
@@ -137,7 +173,27 @@ const ApplicationStepper = ({ applicationStatus }) => {
 
                     {/* Action Button */}
                     <div className="flex-shrink-0">
-                      {isCompleted ? (
+                      {step.id === 4 ? (
+                        isCompleted ? (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                            Completed
+                          </span>
+                        ) : isAvailable ? (
+                          <button
+                            onClick={handleDownloadAcceptanceLetter}
+                            className="inline-flex items-center justify-center bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-sm rounded-full px-8 py-3 shadow-lg shadow-emerald-500/40 hover:shadow-xl hover:scale-105 hover:from-emerald-700 hover:to-teal-700 transition-all duration-300"
+                          >
+                            Download PDF
+                            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+                            Locked
+                          </span>
+                        )
+                      ) : isCompleted ? (
                         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
                           Completed
                         </span>
@@ -145,18 +201,8 @@ const ApplicationStepper = ({ applicationStatus }) => {
                         <Link to={step.route}>
                           <button className="inline-flex items-center justify-center bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-sm rounded-full px-8 py-3 shadow-lg shadow-blue-500/40 hover:shadow-xl hover:scale-105 hover:from-blue-700 hover:to-purple-700 transition-all duration-300">
                             {step.id === 1 ? 'Start' : 'Continue'}
-                            <svg 
-                              className="w-4 h-4 ml-2" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                            >
-                              <path 
-                                strokeLinecap="round" 
-                                strokeLinejoin="round" 
-                                strokeWidth={2.5} 
-                                d="M13 7l5 5m0 0l-5 5m5-5H6" 
-                              />
+                            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                             </svg>
                           </button>
                         </Link>
@@ -164,18 +210,8 @@ const ApplicationStepper = ({ applicationStatus }) => {
                         <Link to={step.route}>
                           <button className="inline-flex items-center justify-center bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-sm rounded-full px-8 py-3 shadow-lg shadow-blue-500/40 hover:shadow-xl hover:scale-105 hover:from-blue-700 hover:to-purple-700 transition-all duration-300">
                             Start
-                            <svg 
-                              className="w-4 h-4 ml-2" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                            >
-                              <path 
-                                strokeLinecap="round" 
-                                strokeLinejoin="round" 
-                                strokeWidth={2.5} 
-                                d="M13 7l5 5m0 0l-5 5m5-5H6" 
-                              />
+                            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                             </svg>
                           </button>
                         </Link>

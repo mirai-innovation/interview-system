@@ -66,6 +66,9 @@ const applicationSchema = new mongoose.Schema(
     isDraft: { type: Boolean, default: true },
     lastSavedAt: { type: Date, default: Date.now },
     
+    // When admin has generated the acceptance letter (unlocks Step 4 for user)
+    acceptanceLetterGeneratedAt: { type: Date },
+
     // Scheduled Meeting (Step 3)
     scheduledMeeting: {
       dateTime: { type: Date },

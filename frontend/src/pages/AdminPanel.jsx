@@ -190,6 +190,10 @@ const AdminPanel = () => {
   const [emailMessage, setEmailMessage] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailResult, setEmailResult] = useState(null);
+  const [showAcceptanceLetterModal, setShowAcceptanceLetterModal] = useState(false);
+  const [selectedUserIdsForLetter, setSelectedUserIdsForLetter] = useState(new Set());
+  const [sendingAcceptanceLetters, setSendingAcceptanceLetters] = useState(false);
+  const [acceptanceLetterBulkResult, setAcceptanceLetterBulkResult] = useState(null);
 
   useEffect(() => {
     fetchUsers();
@@ -514,17 +518,32 @@ const AdminPanel = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Send Email to All Active Users</h2>
-              <p className="text-sm text-gray-600">Send a general email notification to all active users</p>
+              <p className="text-sm text-gray-600">Send a general email notification to all active users, or send acceptance letter to selected users.</p>
             </div>
-            <button
-              onClick={() => setShowEmailModal(true)}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-2 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-              Send Email
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => {
+                  setAcceptanceLetterBulkResult(null);
+                  setSelectedUserIdsForLetter(new Set());
+                  setShowAcceptanceLetterModal(true);
+                }}
+                className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold py-2 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Send Acceptance Letter to Selected Users
+              </button>
+              <button
+                onClick={() => setShowEmailModal(true)}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-2 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Send Email
+              </button>
+            </div>
           </div>
         </div>
 
@@ -966,6 +985,18 @@ const AdminPanel = () => {
                     >
                       Application Info
                     </button>
+                    {userDetails.application && (
+                      <button
+                        onClick={() => setActiveTab('screening')}
+                        className={`px-6 py-3 rounded-t-xl font-semibold transition-all duration-300 whitespace-nowrap ${
+                          activeTab === 'screening'
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                            : 'text-gray-500 hover:bg-white/40'
+                        }`}
+                      >
+                        Screening & Acceptance
+                      </button>
+                    )}
                     <button
                       onClick={() => setActiveTab('cv')}
                       className={`px-6 py-3 rounded-t-xl font-semibold transition-all duration-300 whitespace-nowrap ${
@@ -988,6 +1019,21 @@ const AdminPanel = () => {
                         Interview Results
                       </button>
                     )}
+                    <button
+                      onClick={() => setActiveTab('reports')}
+                      className={`px-6 py-3 rounded-t-xl font-semibold transition-all duration-300 whitespace-nowrap ${
+                        activeTab === 'reports'
+                          ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                          : 'text-gray-500 hover:bg-white/40'
+                      }`}
+                    >
+                      Reports &amp; Feedback
+                      {userDetails.reports?.length > 0 && (
+                        <span className="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-orange-500 text-white text-xs font-bold">
+                          {userDetails.reports.filter(r => !r.resolved).length || userDetails.reports.length}
+                        </span>
+                      )}
+                    </button>
                   </div>
 
                   {/* Tab Content */}
@@ -1063,95 +1109,6 @@ const AdminPanel = () => {
                               <DataCard label="Promotional Code" value={userDetails.application.promotionalCode || 'None'} />
                             </div>
                           </div>
-
-                          {/* Screening Status */}
-                          {userDetails.application?.scheduledMeeting && (
-                            <div className="glass-card p-6 mb-6">
-                              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                Screening Interview Scheduled
-                              </h3>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                <DataCard 
-                                  label="Scheduled Date & Time" 
-                                  value={userDetails.application.scheduledMeeting.dateTime 
-                                    ? new Date(userDetails.application.scheduledMeeting.dateTime).toLocaleString('en-US', {
-                                        year: 'numeric',
-                                        month: 'long',
-                                        day: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                        timeZoneName: 'short'
-                                      })
-                                    : 'N/A'} 
-                                />
-                                <DataCard 
-                                  label="Timezone" 
-                                  value={userDetails.application.scheduledMeeting.timezone || 'N/A'} 
-                                />
-                                {userDetails.application.scheduledMeeting.zoomMeeting?.joinUrl && (
-                                  <DataCard 
-                                    label="Zoom Meeting" 
-                                    value={
-                                      <a 
-                                        href={userDetails.application.scheduledMeeting.zoomMeeting.joinUrl} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="text-blue-600 hover:underline"
-                                      >
-                                        Join Meeting
-                                      </a>
-                                    } 
-                                    colSpan={2}
-                                  />
-                                )}
-                                {userDetails.application.scheduledMeeting.additionalNotes && (
-                                  <DataCard 
-                                    label="Additional Notes" 
-                                    value={userDetails.application.scheduledMeeting.additionalNotes} 
-                                    colSpan={2}
-                                  />
-                                )}
-                              </div>
-                              
-                              {/* Generate Acceptance Letter Button */}
-                              <div className="pt-6 border-t border-white/20">
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      const response = await api.get(`/admin/users/${selectedUser}/acceptance-letter`, {
-                                        responseType: 'blob'
-                                      });
-                                      const url = window.URL.createObjectURL(new Blob([response.data]));
-                                      const link = document.createElement('a');
-                                      const fullName = userDetails.application?.firstName && userDetails.application?.lastName
-                                        ? `${userDetails.application.firstName}_${userDetails.application.lastName}`
-                                        : userDetails.name?.replace(/\s+/g, '_') || 'User';
-                                      const fileName = `Acceptance_Letter_${fullName}.pdf`;
-                                      link.href = url;
-                                      link.setAttribute('download', fileName);
-                                      document.body.appendChild(link);
-                                      link.click();
-                                      link.remove();
-                                      window.URL.revokeObjectURL(url);
-                                    } catch (error) {
-                                      console.error('Error generating acceptance letter:', error);
-                                      const errorMessage = error.response?.data?.message || 'Error generating acceptance letter. Please try again.';
-                                      alert(errorMessage);
-                                    }
-                                  }}
-                                  className="inline-flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
-                                >
-                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                  </svg>
-                                  Generate Acceptance Letter PDF
-                                </button>
-                              </div>
-                            </div>
-                          )}
 
                           {/* Application Status */}
                           <div className="glass-card p-6">
@@ -1272,6 +1229,135 @@ const AdminPanel = () => {
                           </button>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {activeTab === 'screening' && (
+                    <div className="space-y-6">
+                      {/* Screening Interview Status */}
+                      <div className="glass-card p-6">
+                        <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                          <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          Screening Interview
+                        </h3>
+                        {userDetails.application?.scheduledMeeting?.dateTime ? (
+                          <div className="flex items-center gap-2 text-green-700">
+                            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-100 font-medium">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Scheduled
+                            </span>
+                            <span className="text-gray-700">
+                              {new Date(userDetails.application.scheduledMeeting.dateTime).toLocaleString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-amber-700">
+                            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-100 font-medium">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              Not scheduled yet
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Generate Acceptance Letter */}
+                      <div className="glass-card p-6">
+                        <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                          <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Acceptance Letter
+                        </h3>
+                        {userDetails.application?.acceptanceLetterGeneratedAt && (
+                          <div className="mb-4 p-4 rounded-xl bg-green-50 border border-green-200 flex items-center gap-3">
+                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                            <div>
+                              <p className="font-semibold text-green-800">Letter ready — User can download</p>
+                              <p className="text-sm text-green-700">
+                                Released on {new Date(userDetails.application.acceptanceLetterGeneratedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        <p className="text-gray-600 mb-4">
+                          Generate and download the official acceptance letter PDF, or notify the user by email so they can download it from their dashboard.
+                        </p>
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            onClick={async () => {
+                              try {
+                                const response = await api.get(`/admin/users/${selectedUser}/acceptance-letter`, {
+                                  responseType: 'blob'
+                                });
+                                const disposition = response.headers['content-disposition'];
+                                const fileNameMatch = disposition?.match(/filename="?([^"]+)"?/);
+                                const fileName = fileNameMatch?.[1] || `Acceptance_Letter_${selectedUser}.pdf`;
+                                const url = window.URL.createObjectURL(new Blob([response.data]));
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.setAttribute('download', fileName);
+                                document.body.appendChild(link);
+                                link.click();
+                                link.remove();
+                                window.URL.revokeObjectURL(url);
+                                await fetchUserDetails(selectedUser);
+                              } catch (error) {
+                                if (error.response?.data instanceof Blob) {
+                                  error.response.data.text().then((text) => {
+                                    try {
+                                      const jsonError = JSON.parse(text);
+                                      alert(jsonError.message || 'Error generating PDF.');
+                                    } catch {
+                                      alert('Error generating acceptance letter PDF.');
+                                    }
+                                  });
+                                } else {
+                                  alert(error.response?.data?.message || 'Error generating acceptance letter PDF.');
+                                }
+                              }
+                            }}
+                            className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Generate &amp; Download PDF
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                await api.post(`/admin/users/${selectedUser}/acceptance-letter/notify`);
+                                await fetchUserDetails(selectedUser);
+                                alert('Notification sent. The user will receive an email and can download their acceptance letter from the dashboard.');
+                              } catch (error) {
+                                alert(error.response?.data?.message || 'Error sending notification.');
+                              }
+                            }}
+                            className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            Notify User by Email
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -1501,27 +1587,30 @@ const AdminPanel = () => {
                     </div>
                   )}
 
-                  {/* Reports Section */}
-                  {userDetails.reports && userDetails.reports.length > 0 && (
-                    <div className="glass-card p-6 mb-8">
+                  {activeTab === 'reports' && (
+                    <div className="glass-card p-6">
                       <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                         <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
-                        Reports & Feedback ({userDetails.reports.length})
+                        Reports &amp; Feedback {userDetails.reports?.length > 0 && `(${userDetails.reports.length})`}
                       </h3>
-                      <div className="space-y-4">
-                        {userDetails.reports.map((report, idx) => (
-                          <ReportItem
-                            key={idx}
-                            report={report}
-                            reportIndex={idx}
-                            userId={selectedUser}
-                            userName={userDetails.name}
-                            onResponseSent={fetchUserDetails}
-                          />
-                        ))}
-                      </div>
+                      {userDetails.reports && userDetails.reports.length > 0 ? (
+                        <div className="space-y-4">
+                          {userDetails.reports.map((report, idx) => (
+                            <ReportItem
+                              key={idx}
+                              report={report}
+                              reportIndex={idx}
+                              userId={selectedUser}
+                              userName={userDetails.name}
+                              onResponseSent={fetchUserDetails}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 py-8 text-center">No reports or feedback from this user.</p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1636,6 +1725,160 @@ const AdminPanel = () => {
                       )}
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Send Acceptance Letter to Selected Users Modal */}
+        {showAcceptanceLetterModal && (
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => !sendingAcceptanceLetters && setShowAcceptanceLetterModal(false)}
+          >
+            <div
+              className="glass-card max-w-2xl w-full max-h-[90vh] flex flex-col rounded-3xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sticky top-0 glass-card bg-white/70 backdrop-blur-xl border-b border-white/40 p-6 flex items-center justify-between z-10 rounded-t-3xl">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Send Acceptance Letter to Selected Users</h2>
+                <button
+                  onClick={() => !sendingAcceptanceLetters && setShowAcceptanceLetterModal(false)}
+                  disabled={sendingAcceptanceLetters}
+                  className="w-10 h-10 rounded-lg bg-gray-100/50 hover:bg-gray-200/70 text-gray-600 flex items-center justify-center transition hover:scale-110 disabled:opacity-50"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="p-6 overflow-hidden flex flex-col flex-1 min-h-0">
+                {acceptanceLetterBulkResult && (
+                  <div className={`mb-4 p-4 rounded-lg ${
+                    acceptanceLetterBulkResult.failed === 0 && acceptanceLetterBulkResult.sent > 0
+                      ? 'bg-green-50 border border-green-400 text-green-700'
+                      : acceptanceLetterBulkResult.sent > 0
+                        ? 'bg-amber-50 border border-amber-400 text-amber-800'
+                        : 'bg-red-50 border border-red-400 text-red-700'
+                  }`}>
+                    <p className="font-semibold">{acceptanceLetterBulkResult.message}</p>
+                    <p className="text-sm mt-2">
+                      Notified: {acceptanceLetterBulkResult.sent} · Failed: {acceptanceLetterBulkResult.failed}
+                    </p>
+                  </div>
+                )}
+
+                <p className="text-sm text-gray-600 mb-3">
+                  Select users. When you press &quot;Send&quot;, their acceptance letter will be marked as ready and they will receive an email to download it (regardless of application status).
+                </p>
+
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserIdsForLetter(new Set(users.map((u) => u._id)))}
+                    disabled={sendingAcceptanceLetters || users.length === 0}
+                    className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-medium disabled:opacity-50"
+                  >
+                    Select all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserIdsForLetter(new Set())}
+                    disabled={sendingAcceptanceLetters}
+                    className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-medium disabled:opacity-50"
+                  >
+                    Deselect all
+                  </button>
+                  <span className="text-sm text-gray-600 self-center ml-2">
+                    {selectedUserIdsForLetter.size} selected
+                  </span>
+                </div>
+
+                <div className="border border-gray-200 rounded-xl overflow-auto flex-1 min-h-[200px] max-h-[40vh] bg-white/40">
+                  {users.length === 0 ? (
+                    <p className="p-4 text-gray-500 text-center">No users loaded.</p>
+                  ) : (
+                    <ul className="divide-y divide-gray-200">
+                      {users.map((user) => (
+                        <li key={user._id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/50">
+                          <input
+                            type="checkbox"
+                            id={`letter-${user._id}`}
+                            checked={selectedUserIdsForLetter.has(user._id)}
+                            onChange={(e) => {
+                              const next = new Set(selectedUserIdsForLetter);
+                              if (e.target.checked) next.add(user._id);
+                              else next.delete(user._id);
+                              setSelectedUserIdsForLetter(next);
+                            }}
+                            disabled={sendingAcceptanceLetters}
+                            className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <label htmlFor={`letter-${user._id}`} className="flex-1 cursor-pointer text-sm text-gray-800 truncate">
+                            <span className="font-medium">{user.name}</span>
+                            <span className="text-gray-500 ml-2">{user.email}</span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="flex gap-4 pt-4 mt-4 border-t border-white/40">
+                  <button
+                    onClick={() => {
+                      setShowAcceptanceLetterModal(false);
+                      setAcceptanceLetterBulkResult(null);
+                      setSelectedUserIdsForLetter(new Set());
+                    }}
+                    disabled={sendingAcceptanceLetters}
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-all disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (selectedUserIdsForLetter.size === 0) {
+                        alert('Select at least one user.');
+                        return;
+                      }
+                      setSendingAcceptanceLetters(true);
+                      setAcceptanceLetterBulkResult(null);
+                      try {
+                        const response = await api.post('/admin/acceptance-letter/notify-bulk', {
+                          userIds: Array.from(selectedUserIdsForLetter),
+                        });
+                        setAcceptanceLetterBulkResult(response.data);
+                      } catch (error) {
+                        setAcceptanceLetterBulkResult({
+                          message: error.response?.data?.message || 'Error sending acceptance letters.',
+                          sent: 0,
+                          skipped: 0,
+                          failed: selectedUserIdsForLetter.size,
+                        });
+                      } finally {
+                        setSendingAcceptanceLetters(false);
+                      }
+                    }}
+                    disabled={sendingAcceptanceLetters || selectedUserIdsForLetter.size === 0}
+                    className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {sendingAcceptanceLetters ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        Send to {selectedUserIdsForLetter.size} user{selectedUserIdsForLetter.size !== 1 ? 's' : ''}
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>

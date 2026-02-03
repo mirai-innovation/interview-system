@@ -671,3 +671,127 @@ Evaluation and Selection System`;
     return { success: false, error: error.message, details: error };
   }
 };
+
+/**
+ * Notify user that their acceptance letter is ready and they can download it from the dashboard.
+ */
+export const sendAcceptanceLetterReadyNotification = async (userEmail, userName, dashboardUrl) => {
+  try {
+    const transporter = createTransporter();
+    await transporter.verify();
+
+    const safeUserName = escapeHtml(userName || 'Applicant');
+    const safeDashboardUrl = escapeHtml(dashboardUrl || process.env.FRONTEND_URL || '');
+
+    const textVersion = `Mirai Innovation Research Institute - Your Acceptance Letter is Ready
+
+Hello ${userName || 'Applicant'},
+
+Your official acceptance letter for the Mirai Innovation Research Immersion Program is now ready.
+
+You can download your acceptance letter PDF from your dashboard:
+
+${dashboardUrl || '(Log in to the evaluation system and go to your Dashboard)'}
+
+Log in to your account and you will see the "Acceptance Letter" step with a "Download PDF" button.
+
+If you have any questions, please contact us.
+
+Best regards,
+Mirai Innovation Research Institute
+Evaluation Committee`;
+
+    const htmlVersion = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Acceptance Letter is Ready</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; background-color: #f4f4f4;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td style="padding: 20px 0; text-align: center; background-color: #ffffff;">
+        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff;">
+          <tr>
+            <td style="padding: 40px 30px; text-align: center; border-bottom: 3px solid #059669;">
+              <h1 style="margin: 0; color: #047857; font-size: 24px; font-weight: bold;">
+                Mirai Innovation Research Institute
+              </h1>
+              <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px;">
+                Evaluation and Selection System
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px;">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <div style="display: inline-block; width: 64px; height: 64px; background-color: #d1fae5; border-radius: 50%; line-height: 64px; text-align: center; margin: 0 auto;">
+                  <span style="font-size: 32px; color: #059669;">✓</span>
+                </div>
+              </div>
+              <h2 style="margin: 0 0 20px 0; color: #1e293b; font-size: 22px; font-weight: 600; text-align: center;">
+                Your Acceptance Letter is Ready
+              </h2>
+              <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
+                Hello <strong>${safeUserName}</strong>,
+              </p>
+              <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
+                Your official acceptance letter for the Mirai Innovation Research Immersion Program is now ready.
+              </p>
+              <p style="margin: 0 0 30px 0; color: #475569; font-size: 16px; line-height: 1.6;">
+                Log in to your account and go to your <strong>Dashboard</strong>. You will see the &quot;Acceptance Letter&quot; step with a <strong>Download PDF</strong> button to get your letter.
+              </p>
+              <div style="text-align: center; margin-top: 30px;">
+                <a href="${dashboardUrl || (process.env.FRONTEND_URL || '')}" style="display: inline-block; padding: 14px 32px; background-color: #059669; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2);">
+                  Go to Dashboard &amp; Download
+                </a>
+              </div>
+              <p style="margin: 30px 0 0 0; color: #64748b; font-size: 14px; line-height: 1.6;">
+                If you have any questions, please contact our support team.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 30px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="margin: 0 0 10px 0; color: #64748b; font-size: 12px;">
+                <strong>Mirai Innovation Research Institute</strong>
+              </p>
+              <p style="margin: 0; color: #94a3b8; font-size: 11px; line-height: 1.6;">
+                Edge Honmachi Bldg 3F<br>
+                2-3-12 Minamihonmachi, Chuo-ku, Osaka, Japan 541-0054<br>
+                <a href="mailto:contact@mirai-innovation-lab.com" style="color: #2563eb; text-decoration: none;">contact@mirai-innovation-lab.com</a>
+              </p>
+              <p style="margin: 15px 0 0 0; color: #cbd5e1; font-size: 11px;">
+                This is an automated email, please do not reply to this message.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+    const mailOptions = {
+      from: `"Mirai Innovation Research Institute" <${process.env.EMAIL_USER}>`,
+      to: userEmail,
+      replyTo: process.env.EMAIL_USER,
+      subject: 'Your Acceptance Letter is Ready - Mirai Innovation Research Institute',
+      text: textVersion,
+      html: htmlVersion,
+      headers: {
+        'X-Priority': '1',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'high',
+      },
+    };
+
+    const result = await transporter.sendMail(mailOptions);
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};

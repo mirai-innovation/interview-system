@@ -4,12 +4,9 @@ import User from "../models/User.js";
 import Application from "../models/Application.js";
 import { authMiddleware } from "./authRoutes.js";
 import { adminMiddleware } from "../middleware/adminMiddleware.js";
-import { sendBulkEmailToActiveUsers, sendReportResponseNotification } from "../config/email.js";
+import { sendBulkEmailToActiveUsers, sendReportResponseNotification, sendAcceptanceLetterReadyNotification } from "../config/email.js";
 import * as XLSX from "xlsx";
-import PDFDocument from "pdfkit";
-import path from "path";
-import { fileURLToPath } from "url";
-import fs from "fs";
+import { streamAcceptanceLetterPdf } from "../utils/acceptanceLetterPdf.js";
 
 const router = express.Router();
 
@@ -641,7 +638,7 @@ router.patch("/users/:userId/reports/:reportIndex/resolve", async (req, res) => 
   }
 });
 
-// Generate acceptance letter PDF
+// Generate acceptance letter PDF (admin). Standalone: works even if user has no application/screening.
 router.get("/users/:userId/acceptance-letter", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -649,226 +646,153 @@ router.get("/users/:userId/acceptance-letter", async (req, res) => {
     const user = await User.findById(userId).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    const application = await Application.findOne({ userId: userId });
-
-    if (!application || !application.scheduledMeeting || !application.scheduledMeeting.dateTime) {
-      return res.status(400).json({
-        message: "User has not scheduled a screening interview yet. Cannot generate acceptance letter."
+    let application = await Application.findOne({ userId: userId });
+    if (!application) {
+      application = new Application({
+        userId,
+        acceptanceLetterGeneratedAt: new Date(),
       });
+      await application.save();
+    } else if (!application.acceptanceLetterGeneratedAt) {
+      application.acceptanceLetterGeneratedAt = new Date();
+      await application.save();
     }
 
-    const fullName = application?.firstName && application?.lastName
-      ? `${application.firstName} ${application.lastName}`
-      : user.name;
-
-    const regCode = user.digitalId || `MIRI-2026-01-${String(userId).slice(-3).padStart(3, '0')}`;
-
-    const programNames = {
-      'MIRI': 'Mirai Innovation Research Immersion (MIRI) Program 2026',
-      'EMFUTECH': 'Emerging Future Technologies Program 2026',
-      'JCTI': 'Japan-China Technology Innovation Program 2026',
-      'MIRAITEACH': 'Mirai Teaching Program 2026',
-      'FUTURE_INNOVATORS_JAPAN': 'Future Innovators Japan Program 2026',
-      'OTHER': 'Mirai Innovation Research Immersion Program 2026'
-    };
-    const programName = programNames[user.program] || 'Mirai Innovation Research Immersion (MIRI) Program 2026';
-
-    const doc = new PDFDocument({
-      size: 'A4',
-      margins: { top: 60, bottom: 60, left: 72, right: 72 }
-    });
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Acceptance_Letter_${fullName.replace(/\s+/g, '_')}.pdf"`);
-    doc.pipe(res);
-
-    // --- HEADER ---
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-    const logoPath = path.join(__dirname, '../../frontend/src/assets/logo.png');
-
-    const headerY = 60;
-    const textWidth = doc.page.width - 144;
-
-    // Dirección (Izquierda)
-    doc.fontSize(10).font('Helvetica-Bold')
-       .text('Mirai Innovation Research Institute', 72, headerY)
-       .font('Helvetica').fontSize(9).fillColor('#444444')
-       .text('[Headquarters] Minamihonmachi 2-3-12 Edge Honmachi')
-       .text('Chuo-ku, Osaka-shi, Osaka, Japan. 5410054')
-       .text('contact@mirai-innovation-lab.com');
-
-    // Logo (Derecha)
-    if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, doc.page.width - 72 - 80, headerY - 10, { width: 80 });
-    }
-
-    // Fecha dinámica
-    const today = new Date();
-    const day = today.getDate();
-    const suffix = day === 1 || day === 21 || day === 31 ? 'st' : day === 2 || day === 22 ? 'nd' : day === 3 || day === 23 ? 'rd' : 'th';
-    const formattedDate = today.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }).replace(/\d+/, day + suffix);
-
-    // Fecha (Derecha)
-    doc.fillColor('black').fontSize(11).font('Helvetica')
-        .text(formattedDate, 72, headerY + 75, { align: 'right', width: textWidth });
-
-    // Asunto (debajo de la fecha)
-    doc.moveDown(0.5);
-    doc.font('Helvetica').fontSize(11)
-        .text('Subject: Official Final Decision for Mirai Innovation Research Immersion (MIRI) Program 2026', {
-            align: 'right',
-            width: textWidth
-        });
-    doc.moveDown(1.5);
-
-    // --- CUERPO ---
-    doc.font('Helvetica-Bold').fontSize(11).text(`Dear ${fullName},`, 72, doc.y, { align: 'left' });
-    doc.moveDown(1);
-
-    const bodyOptions = { align: 'justify', width: textWidth, lineGap: 2 };
-
-    doc.font('Helvetica').text(
-      'On behalf of the evaluation committee of the Mirai Innovation Research Immersion Program (MIRI) 2026 at the Mirai Innovation Research Institute, it is a great pleasure to inform you that you have been ',
-      { ...bodyOptions, continued: true }
-    )
-    .font('Helvetica-Bold').text('accepted ', { continued: true })
-    .font('Helvetica').text(' to participate in our short-term academic immersion program in Osaka, Japan, for a duration of ', { continued: true })
-    .font('Helvetica-Bold').text('4 to 12 weeks.', { continued: false });
-    doc.moveDown(0.8);
-
-    const currentYear = today.getFullYear();
-
-    doc.font('Helvetica')
-       .text(
-         `Your acceptance is valid for the year ${currentYear}, and your participation must begin after January ${currentYear} and conclude before December ${currentYear}. The exact starting date is flexible, allowing you to select the period that best fits your academic or professional schedule. Below you will find your `,
-         { align: 'justify', width: textWidth, continued: true }
-       )
-       .font('Helvetica-Bold')
-       .text('registration code ', { continued: true, align: 'justify', width: textWidth })
-       .font('Helvetica')
-       .text(
-         'for the program. Please use the registration link provided to select your preferred participation dates and duration:',
-         { align: 'justify', width: textWidth }
-       );
-
-    doc.moveDown(0.8);
-    doc.moveDown(0.5);
-    doc.font('Helvetica-Bold').text(`Registration Code: ${regCode}`, { width: textWidth });
-    doc.font('Helvetica').text('', { continued: false }); // Ensures clean break
-
-    doc.font('Helvetica').text('', { continued: false }); // Spacer if needed
-    doc.font('Helvetica-Bold').text('Registration Link:', { continued: true, width: textWidth });
-    doc.font('Helvetica').text(' ', { continued: true });
-    doc.fillColor('blue').text('https://www.mirai-innovation-lab.com/miri-program-registration-form', {
-        link: 'https://www.mirai-innovation-lab.com/miri-program-registration-form',
-        continued: false
-    }).fillColor('black');
-
-    doc.moveDown(0.8);
-
-    doc.font('Helvetica').text('To confirm your participation, please ensure you ', { ...bodyOptions, continued: true })
-       .font('Helvetica-Bold').text('complete your registration within 1 week', { continued: false })
-       .text(' after receiving this acceptance letter.', bodyOptions);
-
-    doc.moveDown(0.8);
-
-    doc
-      .font('Helvetica')
-      .text(
-        'After completing your registration, you will receive detailed information regarding the ',
-        { align: 'justify', width: textWidth, continued: true }
-      )
-      .font('Helvetica-Bold')
-      .text(
-        'program venue, logistics, and preparation guidelines',
-        { align: 'justify', width: textWidth, continued: true }
-      )
-      .font('Helvetica')
-      .text(
-        '. Additionally, you will be scheduled for a ',
-        { ...bodyOptions, continued: true }
-      )
-      .font('Helvetica-Bold')
-      .text(
-        'new online meeting',
-        { ...bodyOptions, continued: true }
-      )
-      .font('Helvetica')
-      .text(
-        ', where we will discuss your potential project, provide guidance on how to prepare and acquire the necessary skills before beginning your MIRI training, and answer any questions you may have regarding your upcoming travel to Japan.',
-        { ...bodyOptions, continued: false }
-      );
-
-    doc.moveDown(0.8);
-
-    doc.font('Helvetica').text('We are excited to welcome you to Japan—a place where innovation, creativity, and cultural enrichment come together in inspiring ways. We trust that your experience at Mirai Innovation will expand your vision, strengthen your skills, and open meaningful opportunities for your professional and academic future.', bodyOptions);
-
-    doc.moveDown(0.8);
-    doc.text('If you have any questions or require further assistance, please feel free to contact us.', bodyOptions);
-
-    // --- CIERRE Y SELLO ---
-    doc.moveDown(1.5);
-    const closingY = doc.y;
-    const centerX = doc.page.width / 2;
-
-    /*
-    // Dibujar Hanko (Centrado detrás del nombre)
-    const sealY = closingY + 40;
-    doc.save();
-    doc.circle(centerX, sealY, 32).lineWidth(1.2).strokeColor('#DC143C').stroke();
-    doc.fontSize(7).font('Helvetica-Bold').fillColor('#DC143C');
-    doc.text('株式会社', centerX - 25, sealY - 14, { width: 50, align: 'center' });
-    doc.fontSize(5).text('Mirai Innovation', centerX - 25, sealY - 2, { width: 50, align: 'center' });
-    doc.fontSize(6).text('研究所', centerX - 25, sealY + 6, { width: 50, align: 'center' });
-    doc.restore();
-    */
-
-    // Texto de cierre con Hanko (sello japonés) centrado detrás del texto
-
-    // Definir coordenadas base
-    const centerTextX = (doc.page.width - textWidth) / 2;
-    const cierreY = doc.y; // Posición y actual antes de cierre
-
-    // Ruta al hanko: backend/public/images/hanko.jpg (misma base que __dirname = backend/routes)
-    const hankoPath = path.join(__dirname, '..', 'public', 'images', 'hanko.png');
-    const hankoImgSize = 54;
-    const hankoImgOffsetY = 17; // cuanto abajo del cierre
-
-    // Hanko un poco a la derecha, casi al lado de "Institute"
-    const hankoOffsetRight = 85; // puntos a la derecha del centro (ajustar si hace falta)
-    const hankoCenterX = doc.page.width / 2 + hankoOffsetRight - hankoImgSize / 2;
-
-    if (fs.existsSync(hankoPath)) {
-      const hankoCenterY = cierreY + hankoImgOffsetY;
-      doc.image(hankoPath, hankoCenterX, hankoCenterY, { width: hankoImgSize, height: hankoImgSize });
-    }
-
-    // Mueve el texto encima del sello y centrado
-    const cierreTextYOffset = 10; // Puede ajustar para que no se superponga con la imagen
-    doc.fillColor('black').font('Helvetica').fontSize(11)
-       .text('Evaluation Committee', centerTextX, cierreY + cierreTextYOffset, { align: 'center', width: textWidth });
-
-    doc.font('Helvetica-Bold')
-       .text('Mirai Innovation Research Institute', centerTextX, doc.y, { align: 'center', width: textWidth });
-
-    // --- FOOTER ---
-    const footerY = doc.page.height - 100;
-
-    // Línea gris
-    doc.strokeColor('#d1d5db').lineWidth(0.5)
-       .moveTo(72, footerY - 20).lineTo(doc.page.width - 72, footerY - 20).stroke();
-
-    doc.fontSize(7.5).font('Helvetica').fillColor('#6b7280');
-    doc.text('[Lab Address] ATC blg, ITM sec. 6th floor Rm. M-1-3 Nankoukita 2-1-10, Suminoe-ku, Osaka, Japan. 559-0034.', 72, footerY, { align: 'center', width: textWidth });
-    doc.text('Tel.: +81 06-6616-7897', 72, footerY + 12, { align: 'center', width: textWidth });
-    doc.text('www.mirai-innovation-lab.com', 72, footerY + 24, { align: 'center', width: textWidth });
-
-    doc.end();
-
+    streamAcceptanceLetterPdf(res, user, application);
   } catch (error) {
     console.error('Error generating acceptance letter:', error);
     res.status(500).json({ message: "Error generating acceptance letter" });
+  }
+});
+
+// Notify user by email that acceptance letter is ready (standalone: no application/screening required; admin can send to anyone).
+router.post("/users/:userId/acceptance-letter/notify", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findById(userId).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    let application = await Application.findOne({ userId: userId });
+    if (!application) {
+      application = new Application({
+        userId: userId,
+        acceptanceLetterGeneratedAt: new Date(),
+      });
+      await application.save();
+    } else if (!application.acceptanceLetterGeneratedAt) {
+      application.acceptanceLetterGeneratedAt = new Date();
+      await application.save();
+    }
+
+    const fullName =
+      application.firstName && application.lastName
+        ? `${application.firstName} ${application.lastName}`
+        : user.name;
+
+    const dashboardUrl = process.env.FRONTEND_URL
+      ? `${process.env.FRONTEND_URL.replace(/\/$/, "")}/dashboard`
+      : "";
+
+    const emailResult = await sendAcceptanceLetterReadyNotification(
+      user.email,
+      fullName,
+      dashboardUrl
+    );
+
+    if (!emailResult.success) {
+      return res.status(500).json({
+        message: "Acceptance letter was marked as ready, but failed to send notification email.",
+        error: emailResult.error
+      });
+    }
+
+    res.json({
+      message: "User has been notified by email. They can now download their acceptance letter from the dashboard."
+    });
+  } catch (error) {
+    console.error("Error notifying user about acceptance letter:", error);
+    res.status(500).json({ message: "Error sending acceptance letter notification" });
+  }
+});
+
+// Bulk: generate acceptance letter and send notification to selected users (standalone: no application/screening required).
+router.post("/acceptance-letter/notify-bulk", async (req, res) => {
+  try {
+    const { userIds } = req.body;
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ message: "userIds array is required and must not be empty." });
+    }
+
+    const dashboardUrl = process.env.FRONTEND_URL
+      ? `${process.env.FRONTEND_URL.replace(/\/$/, "")}/dashboard`
+      : "";
+
+    const results = [];
+    let sent = 0;
+    let failed = 0;
+
+    for (const userId of userIds) {
+      try {
+        const user = await User.findById(userId).select("-password");
+        if (!user) {
+          results.push({ userId, email: null, success: false, reason: "User not found" });
+          failed++;
+          continue;
+        }
+
+        let application = await Application.findOne({ userId });
+        if (!application) {
+          application = new Application({
+            userId,
+            acceptanceLetterGeneratedAt: new Date(),
+          });
+          await application.save();
+        } else if (!application.acceptanceLetterGeneratedAt) {
+          application.acceptanceLetterGeneratedAt = new Date();
+          await application.save();
+        }
+
+        const fullName =
+          application.firstName && application.lastName
+            ? `${application.firstName} ${application.lastName}`
+            : user.name;
+
+        const emailResult = await sendAcceptanceLetterReadyNotification(
+          user.email,
+          fullName,
+          dashboardUrl
+        );
+
+        if (!emailResult.success) {
+          results.push({ userId, email: user.email, success: false, reason: emailResult.error });
+          failed++;
+          continue;
+        }
+
+        results.push({ userId, email: user.email, success: true });
+        sent++;
+      } catch (err) {
+        console.error(`Bulk acceptance letter: error for user ${userId}:`, err);
+        results.push({
+          userId,
+          email: null,
+          success: false,
+          reason: err.message || "Unknown error",
+        });
+        failed++;
+      }
+    }
+
+    res.json({
+      message: `Processed ${userIds.length} user(s): ${sent} notified, ${failed} failed.`,
+      sent,
+      failed,
+      results,
+    });
+  } catch (error) {
+    console.error("Error in bulk acceptance letter notify:", error);
+    res.status(500).json({ message: "Error processing bulk acceptance letter notification" });
   }
 });
 
