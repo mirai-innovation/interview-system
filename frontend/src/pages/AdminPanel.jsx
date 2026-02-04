@@ -194,6 +194,8 @@ const AdminPanel = () => {
   const [selectedUserIdsForLetter, setSelectedUserIdsForLetter] = useState(new Set());
   const [sendingAcceptanceLetters, setSendingAcceptanceLetters] = useState(false);
   const [acceptanceLetterBulkResult, setAcceptanceLetterBulkResult] = useState(null);
+  const [acceptanceLetterProgramType, setAcceptanceLetterProgramType] = useState('MIRI'); // For single user
+  const [bulkAcceptanceLetterProgramType, setBulkAcceptanceLetterProgramType] = useState('MIRI'); // For bulk
 
   useEffect(() => {
     fetchUsers();
@@ -302,6 +304,12 @@ const AdminPanel = () => {
       const response = await api.get(`/admin/users/${userId}`);
       setUserDetails(response.data);
       setSelectedUser(userId);
+      // Set the program type if it exists, otherwise default to MIRI
+      if (response.data.application?.acceptanceLetterProgramType) {
+        setAcceptanceLetterProgramType(response.data.application.acceptanceLetterProgramType);
+      } else {
+        setAcceptanceLetterProgramType('MIRI');
+      }
     } catch (error) {
       console.error('Error fetching user details:', error);
       alert('Error fetching user details');
@@ -1287,10 +1295,10 @@ const AdminPanel = () => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
                             </div>
-                            <div>
+                            <div className="flex-1">
                               <p className="font-semibold text-green-800">Letter ready — User can download</p>
                               <p className="text-sm text-green-700">
-                                Released on {new Date(userDetails.application.acceptanceLetterGeneratedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                                Program: {userDetails.application.acceptanceLetterProgramType === 'FIJSE' ? 'Future Innovators Japan Selection Entry' : 'MIRI'} · Released on {new Date(userDetails.application.acceptanceLetterGeneratedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
                               </p>
                             </div>
                           </div>
@@ -1298,11 +1306,24 @@ const AdminPanel = () => {
                         <p className="text-gray-600 mb-4">
                           Generate and download the official acceptance letter PDF, or notify the user by email so they can download it from their dashboard.
                         </p>
+                        <div className="mb-4">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Select Program:
+                          </label>
+                          <select
+                            value={acceptanceLetterProgramType}
+                            onChange={(e) => setAcceptanceLetterProgramType(e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                          >
+                            <option value="MIRI">MIRI (Mirai Innovation Research Immersion Program)</option>
+                            <option value="FIJSE">Future Innovators Japan Selection Entry</option>
+                          </select>
+                        </div>
                         <div className="flex flex-wrap gap-3">
                           <button
                             onClick={async () => {
                               try {
-                                const response = await api.get(`/admin/users/${selectedUser}/acceptance-letter`, {
+                                const response = await api.get(`/admin/users/${selectedUser}/acceptance-letter?programType=${acceptanceLetterProgramType}`, {
                                   responseType: 'blob'
                                 });
                                 const disposition = response.headers['content-disposition'];
@@ -1342,7 +1363,9 @@ const AdminPanel = () => {
                           <button
                             onClick={async () => {
                               try {
-                                await api.post(`/admin/users/${selectedUser}/acceptance-letter/notify`);
+                                await api.post(`/admin/users/${selectedUser}/acceptance-letter/notify`, {
+                                  programType: acceptanceLetterProgramType
+                                });
                                 await fetchUserDetails(selectedUser);
                                 alert('Notification sent. The user will receive an email and can download their acceptance letter from the dashboard.');
                               } catch (error) {
@@ -1774,6 +1797,21 @@ const AdminPanel = () => {
                   Select users. When you press &quot;Send&quot;, their acceptance letter will be marked as ready and they will receive an email to download it (regardless of application status).
                 </p>
 
+                <div className="mb-4">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Select Program:
+                  </label>
+                  <select
+                    value={bulkAcceptanceLetterProgramType}
+                    onChange={(e) => setBulkAcceptanceLetterProgramType(e.target.value)}
+                    disabled={sendingAcceptanceLetters}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50"
+                  >
+                    <option value="MIRI">MIRI (Mirai Innovation Research Immersion Program)</option>
+                    <option value="FIJSE">Future Innovators Japan Selection Entry</option>
+                  </select>
+                </div>
+
                 <div className="flex gap-2 mb-3">
                   <button
                     type="button"
@@ -1832,6 +1870,7 @@ const AdminPanel = () => {
                       setShowAcceptanceLetterModal(false);
                       setAcceptanceLetterBulkResult(null);
                       setSelectedUserIdsForLetter(new Set());
+                      setBulkAcceptanceLetterProgramType('MIRI');
                     }}
                     disabled={sendingAcceptanceLetters}
                     className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-all disabled:opacity-50"
@@ -1849,6 +1888,7 @@ const AdminPanel = () => {
                       try {
                         const response = await api.post('/admin/acceptance-letter/notify-bulk', {
                           userIds: Array.from(selectedUserIdsForLetter),
+                          programType: bulkAcceptanceLetterProgramType,
                         });
                         setAcceptanceLetterBulkResult(response.data);
                       } catch (error) {

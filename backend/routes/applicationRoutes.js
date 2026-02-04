@@ -224,7 +224,9 @@ router.get("/acceptance-letter", authMiddleware, async (req, res) => {
       await application.save();
     }
 
-    streamAcceptanceLetterPdf(res, user, application);
+    // Use the program type stored in the application (default to MIRI for backward compatibility)
+    const programType = application.acceptanceLetterProgramType || 'MIRI';
+    streamAcceptanceLetterPdf(res, user, application, programType);
   } catch (error) {
     console.error("Error downloading acceptance letter:", error);
     res.status(500).json({ message: "Error downloading acceptance letter" });

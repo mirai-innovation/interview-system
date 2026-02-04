@@ -674,8 +674,12 @@ Evaluation and Selection System`;
 
 /**
  * Notify user that their acceptance letter is ready and they can download it from the dashboard.
+ * @param {string} userEmail - User email
+ * @param {string} userName - User name
+ * @param {string} dashboardUrl - Dashboard URL
+ * @param {string} programType - Program type: 'MIRI' or 'FIJSE' (default: 'MIRI')
  */
-export const sendAcceptanceLetterReadyNotification = async (userEmail, userName, dashboardUrl) => {
+export const sendAcceptanceLetterReadyNotification = async (userEmail, userName, dashboardUrl, programType = 'MIRI') => {
   try {
     const transporter = createTransporter();
     await transporter.verify();
@@ -685,11 +689,16 @@ export const sendAcceptanceLetterReadyNotification = async (userEmail, userName,
     const finalDashboardUrl = (dashboardUrl || `${portalBase.replace(/\/$/, '')}/dashboard`).trim();
     const safeDashboardUrl = escapeHtml(finalDashboardUrl);
 
+    const programName = programType === 'FIJSE' 
+      ? 'Future Innovators Japan Selection Entry Program'
+      : 'Mirai Innovation Research Immersion (MIRI) Program';
+    const safeProgramName = escapeHtml(programName);
+
     const textVersion = `Mirai Innovation Research Institute - Your Acceptance Letter is Ready
 
 Hello ${userName || 'Applicant'},
 
-Your official acceptance letter for the Mirai Innovation Research Immersion Program is now ready.
+Your official acceptance letter for the ${programName} is now ready.
 
 You can download your acceptance letter PDF from your dashboard:
 
@@ -740,7 +749,7 @@ Evaluation Committee`;
                 Hello <strong>${safeUserName}</strong>,
               </p>
               <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-                Your official acceptance letter for the Mirai Innovation Research Immersion Program is now ready.
+                Your official acceptance letter for the <strong>${safeProgramName}</strong> is now ready.
               </p>
               <p style="margin: 0 0 30px 0; color: #475569; font-size: 16px; line-height: 1.6;">
                 Log in to your account and go to your <strong>Dashboard</strong>. You will see the &quot;Acceptance Letter&quot; step with a <strong>Download PDF</strong> button to get your letter.

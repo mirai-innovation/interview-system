@@ -639,9 +639,11 @@ router.patch("/users/:userId/reports/:reportIndex/resolve", async (req, res) => 
 });
 
 // Generate acceptance letter PDF (admin). Standalone: works even if user has no application/screening.
+// Query param: programType (optional, default: 'MIRI') - 'MIRI' or 'FIJSE'
 router.get("/users/:userId/acceptance-letter", async (req, res) => {
   try {
     const { userId } = req.params;
+    const programType = req.query.programType === 'FIJSE' ? 'FIJSE' : 'MIRI';
 
     const user = await User.findById(userId).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -651,14 +653,18 @@ router.get("/users/:userId/acceptance-letter", async (req, res) => {
       application = new Application({
         userId,
         acceptanceLetterGeneratedAt: new Date(),
+        acceptanceLetterProgramType: programType,
       });
       await application.save();
-    } else if (!application.acceptanceLetterGeneratedAt) {
-      application.acceptanceLetterGeneratedAt = new Date();
+    } else {
+      if (!application.acceptanceLetterGeneratedAt) {
+        application.acceptanceLetterGeneratedAt = new Date();
+      }
+      application.acceptanceLetterProgramType = programType;
       await application.save();
     }
 
-    streamAcceptanceLetterPdf(res, user, application);
+    streamAcceptanceLetterPdf(res, user, application, programType);
   } catch (error) {
     console.error('Error generating acceptance letter:', error);
     res.status(500).json({ message: "Error generating acceptance letter" });
@@ -666,9 +672,11 @@ router.get("/users/:userId/acceptance-letter", async (req, res) => {
 });
 
 // Notify user by email that acceptance letter is ready (standalone: no application/screening required; admin can send to anyone).
+// Body param: programType (optional, default: 'MIRI') - 'MIRI' or 'FIJSE'
 router.post("/users/:userId/acceptance-letter/notify", async (req, res) => {
   try {
     const { userId } = req.params;
+    const programType = req.body.programType === 'FIJSE' ? 'FIJSE' : 'MIRI';
 
     const user = await User.findById(userId).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -678,10 +686,14 @@ router.post("/users/:userId/acceptance-letter/notify", async (req, res) => {
       application = new Application({
         userId: userId,
         acceptanceLetterGeneratedAt: new Date(),
+        acceptanceLetterProgramType: programType,
       });
       await application.save();
-    } else if (!application.acceptanceLetterGeneratedAt) {
-      application.acceptanceLetterGeneratedAt = new Date();
+    } else {
+      if (!application.acceptanceLetterGeneratedAt) {
+        application.acceptanceLetterGeneratedAt = new Date();
+      }
+      application.acceptanceLetterProgramType = programType;
       await application.save();
     }
 
@@ -697,7 +709,8 @@ router.post("/users/:userId/acceptance-letter/notify", async (req, res) => {
     const emailResult = await sendAcceptanceLetterReadyNotification(
       user.email,
       fullName,
-      dashboardUrl
+      dashboardUrl,
+      programType
     );
 
     if (!emailResult.success) {
@@ -717,12 +730,14 @@ router.post("/users/:userId/acceptance-letter/notify", async (req, res) => {
 });
 
 // Bulk: generate acceptance letter and send notification to selected users (standalone: no application/screening required).
+// Body param: userIds (array), programType (optional, default: 'MIRI') - 'MIRI' or 'FIJSE'
 router.post("/acceptance-letter/notify-bulk", async (req, res) => {
   try {
-    const { userIds } = req.body;
+    const { userIds, programType: bodyProgramType } = req.body;
     if (!Array.isArray(userIds) || userIds.length === 0) {
       return res.status(400).json({ message: "userIds array is required and must not be empty." });
     }
+    const programType = bodyProgramType === 'FIJSE' ? 'FIJSE' : 'MIRI';
 
     // Use student portal URL for acceptance email so users always land on https://studentportal.mirai-education.tech
     const studentPortalBase = (process.env.STUDENT_PORTAL_URL || process.env.FRONTEND_URL || "https://studentportal.mirai-education.tech").replace(/\/$/, "");
@@ -746,10 +761,14 @@ router.post("/acceptance-letter/notify-bulk", async (req, res) => {
           application = new Application({
             userId,
             acceptanceLetterGeneratedAt: new Date(),
+            acceptanceLetterProgramType: programType,
           });
           await application.save();
-        } else if (!application.acceptanceLetterGeneratedAt) {
-          application.acceptanceLetterGeneratedAt = new Date();
+        } else {
+          if (!application.acceptanceLetterGeneratedAt) {
+            application.acceptanceLetterGeneratedAt = new Date();
+          }
+          application.acceptanceLetterProgramType = programType;
           await application.save();
         }
 
@@ -761,7 +780,8 @@ router.post("/acceptance-letter/notify-bulk", async (req, res) => {
         const emailResult = await sendAcceptanceLetterReadyNotification(
           user.email,
           fullName,
-          dashboardUrl
+          dashboardUrl,
+          programType
         );
 
         if (!emailResult.success) {

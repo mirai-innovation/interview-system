@@ -68,6 +68,8 @@ const applicationSchema = new mongoose.Schema(
     
     // When admin has generated the acceptance letter (unlocks Step 4 for user)
     acceptanceLetterGeneratedAt: { type: Date },
+    // Program type for the acceptance letter: 'MIRI' or 'FIJSE' (Future Innovators Japan Selection Entry)
+    acceptanceLetterProgramType: { type: String, enum: ['MIRI', 'FIJSE'], default: 'MIRI' },
 
     // Scheduled Meeting (Step 3)
     scheduledMeeting: {
