@@ -531,97 +531,103 @@ const AdminPanel = () => {
         )}
 
         {/* Send Bulk Email Section */}
-        <div className="glass-card p-4 sm:p-6 md:p-8 mb-6 sm:mb-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+        <div className="glass-card p-5 sm:p-6 md:p-8 mb-6 sm:mb-8 rounded-2xl border border-gray-200/60">
+          <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Send Email to All Active Users</h2>
-              <p className="text-sm text-gray-600">Send a general email notification to all active users, or send acceptance letter to selected users.</p>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-1">Email & acceptance letters</h2>
+              <p className="text-sm text-gray-500">Notify selected users with an acceptance letter, or send a general email to all active users.</p>
             </div>
-            <div className="flex flex-wrap gap-3 items-center">
-              <button
-                onClick={() => {
-                  setAcceptanceLetterBulkResult(null);
-                  setSelectedUserIdsForLetter(new Set());
-                  setShowAcceptanceLetterModal(true);
-                }}
-                className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold py-2 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Send Acceptance Letter to Selected Users
-              </button>
-              <div className="flex flex-wrap gap-2 items-center">
-                <select
-                  value={downloadAllLettersProgramType}
-                  onChange={(e) => setDownloadAllLettersProgramType(e.target.value)}
-                  disabled={downloadingAllLetters}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm disabled:opacity-50"
-                >
-                  <option value="MIRI">MIRI</option>
-                  <option value="FIJSE">Future Innovators (FIJSE)</option>
-                </select>
+            <div className="flex flex-col sm:flex-row flex-wrap gap-4 sm:gap-5 items-stretch sm:items-center">
+              {/* Acceptance letter: primary CTA */}
+              <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 items-stretch sm:items-center">
                 <button
-                  onClick={async () => {
-                    setDownloadingAllLetters(true);
-                    try {
-                      const response = await api.post('/admin/acceptance-letter/download-all', {
-                        programType: downloadAllLettersProgramType,
-                      }, { responseType: 'blob' });
-                      const url = window.URL.createObjectURL(new Blob([response.data]));
-                      const link = document.createElement('a');
-                      link.href = url;
-                      link.setAttribute('download', `acceptance_letters_${downloadAllLettersProgramType}_${new Date().toISOString().slice(0, 10)}.zip`);
-                      document.body.appendChild(link);
-                      link.click();
-                      link.remove();
-                      window.URL.revokeObjectURL(url);
-                      alert('ZIP download started. It may take a moment for large files.');
-                    } catch (error) {
-                      if (error.response?.data instanceof Blob) {
-                        const text = await error.response.data.text();
-                        try {
-                          const json = JSON.parse(text);
-                          alert(json.message || 'Error downloading letters.');
-                        } catch {
-                          alert('Error downloading letters.');
-                        }
-                      } else {
-                        alert(error.response?.data?.message || 'Error downloading letters.');
-                      }
-                    } finally {
-                      setDownloadingAllLetters(false);
-                    }
+                  onClick={() => {
+                    setAcceptanceLetterBulkResult(null);
+                    setSelectedUserIdsForLetter(new Set());
+                    setShowAcceptanceLetterModal(true);
                   }}
-                  disabled={downloadingAllLetters}
-                  className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold py-2 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-medium hover:bg-gray-800 transition shadow-sm hover:shadow"
                 >
-                  {downloadingAllLetters ? (
-                    <>
-                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Generating…
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Download All Users&apos; Letters
-                    </>
-                  )}
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Send acceptance letter to selected
                 </button>
+                {/* Download all: program + button grouped */}
+                <div className="inline-flex flex-wrap gap-2 items-center rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2">
+                  <select
+                    value={downloadAllLettersProgramType}
+                    onChange={(e) => setDownloadAllLettersProgramType(e.target.value)}
+                    disabled={downloadingAllLetters}
+                    className="bg-transparent border-0 text-gray-700 text-sm font-medium focus:outline-none focus:ring-0 py-1 pr-6 disabled:opacity-50"
+                  >
+                    <option value="MIRI">MIRI</option>
+                    <option value="FIJSE">FIJSE</option>
+                  </select>
+                  <span className="text-gray-300">|</span>
+                  <button
+                    onClick={async () => {
+                      setDownloadingAllLetters(true);
+                      try {
+                        const response = await api.post('/admin/acceptance-letter/download-all', {
+                          programType: downloadAllLettersProgramType,
+                        }, { responseType: 'blob' });
+                        const url = window.URL.createObjectURL(new Blob([response.data]));
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.setAttribute('download', `acceptance_letters_${downloadAllLettersProgramType}_${new Date().toISOString().slice(0, 10)}.zip`);
+                        document.body.appendChild(link);
+                        link.click();
+                        link.remove();
+                        window.URL.revokeObjectURL(url);
+                        alert('ZIP download started. It may take a moment for large files.');
+                      } catch (error) {
+                        if (error.response?.data instanceof Blob) {
+                          const text = await error.response.data.text();
+                          try {
+                            const json = JSON.parse(text);
+                            alert(json.message || 'Error downloading letters.');
+                          } catch {
+                            alert('Error downloading letters.');
+                          }
+                        } else {
+                          alert(error.response?.data?.message || 'Error downloading letters.');
+                        }
+                      } finally {
+                        setDownloadingAllLetters(false);
+                      }
+                    }}
+                    disabled={downloadingAllLetters}
+                    className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {downloadingAllLetters ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Generating…
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Download all letters
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
+              {/* General email: secondary */}
               <button
                 onClick={() => setShowEmailModal(true)}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-2 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 hover:border-gray-400 transition"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
-                Send Email
+                Send email to all active users
               </button>
             </div>
           </div>
