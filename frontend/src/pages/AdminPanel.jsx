@@ -196,6 +196,8 @@ const AdminPanel = () => {
   const [acceptanceLetterBulkResult, setAcceptanceLetterBulkResult] = useState(null);
   const [acceptanceLetterProgramType, setAcceptanceLetterProgramType] = useState('MIRI'); // For single user
   const [bulkAcceptanceLetterProgramType, setBulkAcceptanceLetterProgramType] = useState('MIRI'); // For bulk
+  const [downloadAllLettersProgramType, setDownloadAllLettersProgramType] = useState('MIRI');
+  const [downloadingAllLetters, setDownloadingAllLetters] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -528,7 +530,7 @@ const AdminPanel = () => {
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Send Email to All Active Users</h2>
               <p className="text-sm text-gray-600">Send a general email notification to all active users, or send acceptance letter to selected users.</p>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 items-center">
               <button
                 onClick={() => {
                   setAcceptanceLetterBulkResult(null);
@@ -542,6 +544,69 @@ const AdminPanel = () => {
                 </svg>
                 Send Acceptance Letter to Selected Users
               </button>
+              <div className="flex flex-wrap gap-2 items-center">
+                <select
+                  value={downloadAllLettersProgramType}
+                  onChange={(e) => setDownloadAllLettersProgramType(e.target.value)}
+                  disabled={downloadingAllLetters}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm disabled:opacity-50"
+                >
+                  <option value="MIRI">MIRI</option>
+                  <option value="FIJSE">Future Innovators (FIJSE)</option>
+                </select>
+                <button
+                  onClick={async () => {
+                    setDownloadingAllLetters(true);
+                    try {
+                      const response = await api.post('/admin/acceptance-letter/download-all', {
+                        programType: downloadAllLettersProgramType,
+                      }, { responseType: 'blob' });
+                      const url = window.URL.createObjectURL(new Blob([response.data]));
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.setAttribute('download', `acceptance_letters_${downloadAllLettersProgramType}_${new Date().toISOString().slice(0, 10)}.zip`);
+                      document.body.appendChild(link);
+                      link.click();
+                      link.remove();
+                      window.URL.revokeObjectURL(url);
+                      alert('ZIP download started. It may take a moment for large files.');
+                    } catch (error) {
+                      if (error.response?.data instanceof Blob) {
+                        const text = await error.response.data.text();
+                        try {
+                          const json = JSON.parse(text);
+                          alert(json.message || 'Error downloading letters.');
+                        } catch {
+                          alert('Error downloading letters.');
+                        }
+                      } else {
+                        alert(error.response?.data?.message || 'Error downloading letters.');
+                      }
+                    } finally {
+                      setDownloadingAllLetters(false);
+                    }
+                  }}
+                  disabled={downloadingAllLetters}
+                  className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold py-2 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {downloadingAllLetters ? (
+                    <>
+                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Generating…
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Download All Users&apos; Letters
+                    </>
+                  )}
+                </button>
+              </div>
               <button
                 onClick={() => setShowEmailModal(true)}
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-2 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl flex items-center gap-2"

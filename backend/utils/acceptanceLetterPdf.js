@@ -2,6 +2,7 @@ import PDFDocument from "pdfkit";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
+import { Writable } from "stream";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +19,35 @@ export function streamAcceptanceLetterPdf(res, user, application, programType = 
     return streamFIJSEAcceptanceLetterPdf(res, user, application);
   }
   return streamMIRIAcceptanceLetterPdf(res, user, application);
+}
+
+/**
+ * Generates the acceptance letter PDF and returns it as a Buffer (e.g. for zipping).
+ * @param {object} user - User document (plain or mongoose)
+ * @param {object} application - Application document (plain or mongoose)
+ * @param {string} programType - Program type: 'MIRI' or 'FIJSE'
+ * @returns {Promise<Buffer>}
+ */
+export function generateAcceptanceLetterPdfBuffer(user, application, programType = 'MIRI') {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    const writable = new Writable({
+      write(chunk, enc, cb) {
+        chunks.push(chunk);
+        cb();
+      },
+      final(cb) {
+        resolve(Buffer.concat(chunks));
+        cb();
+      },
+    });
+    writable.setHeader = () => {};
+    try {
+      streamAcceptanceLetterPdf(writable, user, application, programType);
+    } catch (e) {
+      reject(e);
+    }
+  });
 }
 
 /**

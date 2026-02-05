@@ -6,7 +6,8 @@ import { authMiddleware } from "./authRoutes.js";
 import { adminMiddleware } from "../middleware/adminMiddleware.js";
 import { sendBulkEmailToActiveUsers, sendReportResponseNotification, sendAcceptanceLetterReadyNotification } from "../config/email.js";
 import * as XLSX from "xlsx";
-import { streamAcceptanceLetterPdf } from "../utils/acceptanceLetterPdf.js";
+import archiver from "archiver";
+import { streamAcceptanceLetterPdf, generateAcceptanceLetterPdfBuffer } from "../utils/acceptanceLetterPdf.js";
 
 const router = express.Router();
 
@@ -813,6 +814,76 @@ router.post("/acceptance-letter/notify-bulk", async (req, res) => {
   } catch (error) {
     console.error("Error in bulk acceptance letter notify:", error);
     res.status(500).json({ message: "Error processing bulk acceptance letter notification" });
+  }
+});
+
+// Download all users' acceptance letters as a ZIP file.
+// Body param: programType (optional, default: 'MIRI') - 'MIRI' or 'FIJSE'
+router.post("/acceptance-letter/download-all", async (req, res) => {
+  try {
+    const programType = req.body.programType === 'FIJSE' ? 'FIJSE' : 'MIRI';
+    const users = await User.find({}).select("-password").lean();
+    if (!users.length) {
+      return res.status(400).json({ message: "No users found." });
+    }
+
+    const zipFilename = `acceptance_letters_${programType}_${new Date().toISOString().slice(0, 10)}.zip`;
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${zipFilename}"`);
+
+    const archive = archiver("zip", { zlib: { level: 9 } });
+    archive.on("error", (err) => {
+      console.error("Archiver error:", err);
+      res.status(500).end();
+    });
+    archive.pipe(res);
+
+    let added = 0;
+    let failed = 0;
+    const seenNames = new Set();
+
+    for (const user of users) {
+      try {
+        let application = await Application.findOne({ userId: user._id });
+        if (!application) {
+          application = await Application.create({
+            userId: user._id,
+            acceptanceLetterGeneratedAt: new Date(),
+            acceptanceLetterProgramType: programType,
+          });
+        } else {
+          application.acceptanceLetterProgramType = programType;
+          if (!application.acceptanceLetterGeneratedAt) {
+            application.acceptanceLetterGeneratedAt = new Date();
+          }
+          await application.save();
+        }
+        const fullName =
+          (application.firstName && application.lastName
+            ? `${application.firstName} ${application.lastName}`
+            : user.name || "User").trim() || "User";
+        const safeName = fullName.replace(/[^a-zA-Z0-9_\-\s]/g, "").replace(/\s+/g, "_") || `user_${user._id}`;
+        let fileName = `Acceptance_Letter_${programType}_${safeName}.pdf`;
+        if (seenNames.has(fileName)) {
+          fileName = `Acceptance_Letter_${programType}_${safeName}_${String(user._id).slice(-4)}.pdf`;
+        }
+        seenNames.add(fileName);
+
+        const buffer = await generateAcceptanceLetterPdfBuffer(user, application, programType);
+        archive.append(buffer, { name: fileName });
+        added++;
+      } catch (err) {
+        console.error(`Download-all: error for user ${user._id}:`, err);
+        failed++;
+      }
+    }
+
+    await archive.finalize();
+  } catch (error) {
+    console.error("Error in download-all acceptance letters:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "Error generating ZIP of acceptance letters." });
+    }
   }
 });
 
