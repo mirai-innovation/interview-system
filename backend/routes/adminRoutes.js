@@ -775,6 +775,26 @@ router.post("/acceptance-letter/notify-bulk", async (req, res) => {
         }
 
         let application = await Application.findOne({ userId });
+        const fullName =
+          application?.firstName && application?.lastName
+            ? `${application.firstName} ${application.lastName}`
+            : user.name;
+
+        // Send email first; only mark letter as sent when email succeeds
+        const emailResult = await sendAcceptanceLetterReadyNotification(
+          user.email,
+          fullName,
+          dashboardUrl,
+          programType
+        );
+
+        if (!emailResult.success) {
+          results.push({ userId, email: user.email, success: false, reason: emailResult.error });
+          failed++;
+          continue;
+        }
+
+        // Email sent successfully: now set acceptanceLetterGeneratedAt so dashboard shows "Sent"
         if (!application) {
           application = new Application({
             userId,
@@ -788,24 +808,6 @@ router.post("/acceptance-letter/notify-bulk", async (req, res) => {
           }
           application.acceptanceLetterProgramType = programType;
           await application.save();
-        }
-
-        const fullName =
-          application.firstName && application.lastName
-            ? `${application.firstName} ${application.lastName}`
-            : user.name;
-
-        const emailResult = await sendAcceptanceLetterReadyNotification(
-          user.email,
-          fullName,
-          dashboardUrl,
-          programType
-        );
-
-        if (!emailResult.success) {
-          results.push({ userId, email: user.email, success: false, reason: emailResult.error });
-          failed++;
-          continue;
         }
 
         results.push({ userId, email: user.email, success: true });
