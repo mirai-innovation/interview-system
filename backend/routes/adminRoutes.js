@@ -62,8 +62,20 @@ router.get("/users", async (req, res) => {
 
     console.log(`Usuarios obtenidos: ${users.length}`);
 
+    // Add acceptance letter information for each user
+    const usersWithAcceptanceLetter = await Promise.all(
+      users.map(async (user) => {
+        const application = await Application.findOne({ userId: user._id }).select('acceptanceLetterGeneratedAt acceptanceLetterProgramType');
+        return {
+          ...user.toObject(),
+          acceptanceLetterGeneratedAt: application?.acceptanceLetterGeneratedAt || null,
+          acceptanceLetterProgramType: application?.acceptanceLetterProgramType || null,
+        };
+      })
+    );
+
     res.json({
-      users,
+      users: usersWithAcceptanceLetter,
       totalPages: limit ? Math.ceil(total / limit) : 1,
       currentPage: page,
       total
@@ -744,11 +756,16 @@ router.post("/acceptance-letter/notify-bulk", async (req, res) => {
     const studentPortalBase = (process.env.STUDENT_PORTAL_URL || process.env.FRONTEND_URL || "https://studentportal.mirai-education.tech").replace(/\/$/, "");
     const dashboardUrl = `${studentPortalBase}/dashboard`;
 
+    // Helper function to delay between emails (to avoid Gmail rate limits)
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const DELAY_BETWEEN_EMAILS = 2000; // 2 seconds between each email (30 emails/minute - safe for Gmail)
+
     const results = [];
     let sent = 0;
     let failed = 0;
 
-    for (const userId of userIds) {
+    for (let i = 0; i < userIds.length; i++) {
+      const userId = userIds[i];
       try {
         const user = await User.findById(userId).select("-password");
         if (!user) {
@@ -802,6 +819,11 @@ router.post("/acceptance-letter/notify-bulk", async (req, res) => {
           reason: err.message || "Unknown error",
         });
         failed++;
+      }
+
+      // Add delay between emails to avoid Gmail rate limits (except after the last one)
+      if (i < userIds.length - 1) {
+        await delay(DELAY_BETWEEN_EMAILS);
       }
     }
 

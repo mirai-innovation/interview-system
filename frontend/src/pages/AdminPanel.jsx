@@ -184,6 +184,7 @@ const AdminPanel = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterAcceptanceLetter, setFilterAcceptanceLetter] = useState(''); // 'sent', 'not-sent', ''
   const [sortBy, setSortBy] = useState(''); // Sort by: 'both', 'cv-only', 'none', 'with-reports'
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailSubject, setEmailSubject] = useState('');
@@ -377,6 +378,12 @@ const AdminPanel = () => {
                          (filterStatus === 'active' && user.isActive) ||
                          (filterStatus === 'inactive' && !user.isActive);
     
+    // Filter by acceptance letter status
+    const hasAcceptanceLetter = user.acceptanceLetterGeneratedAt !== null && user.acceptanceLetterGeneratedAt !== undefined;
+    const matchesAcceptanceLetter = !filterAcceptanceLetter ||
+                                   (filterAcceptanceLetter === 'sent' && hasAcceptanceLetter) ||
+                                   (filterAcceptanceLetter === 'not-sent' && !hasAcceptanceLetter);
+    
     // Filter by score status
     const hasCVScore = user.score !== undefined && user.score !== null;
     const hasInterviewScore = user.interviewScore !== undefined && user.interviewScore !== null;
@@ -399,7 +406,7 @@ const AdminPanel = () => {
     }
     // If sortBy is empty, show all
     
-    return matchesSearch && matchesRole && matchesStatus;
+    return matchesSearch && matchesRole && matchesStatus && matchesAcceptanceLetter;
   });
   
   // Sort users based on sortBy
@@ -758,6 +765,15 @@ const AdminPanel = () => {
                 <option value="none">No Scores</option>
                 <option value="with-reports">With Unresolved Reports</option>
               </select>
+              <select
+                value={filterAcceptanceLetter}
+                onChange={(e) => setFilterAcceptanceLetter(e.target.value)}
+                className="glass-card bg-white/40 border border-white/40 px-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">All Acceptance Letters</option>
+                <option value="sent">Letter Sent</option>
+                <option value="not-sent">Letter Not Sent</option>
+              </select>
             </div>
           </div>
 
@@ -772,13 +788,14 @@ const AdminPanel = () => {
                   <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Status</th>
                   <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Score</th>
                   <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Reports</th>
+                  <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Acceptance Letter</th>
                   <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="px-6 py-12 text-center">
+                    <td colSpan="9" className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <svg className="w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -922,6 +939,33 @@ const AdminPanel = () => {
                         </div>
                       ) : (
                         <span className="text-gray-400 text-xs">No reports</span>
+                      )}
+                    </td>
+                    <td className="px-3 sm:px-6 py-3 sm:py-4">
+                      {user.acceptanceLetterGeneratedAt ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="inline-flex items-center gap-1.5 bg-green-100/70 text-green-700 border border-green-300 rounded-full px-2.5 py-1 text-xs font-semibold shadow-sm">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Sent
+                          </span>
+                          {user.acceptanceLetterProgramType && (
+                            <span className="text-xs text-gray-600">
+                              {user.acceptanceLetterProgramType === 'FIJSE' ? 'FIJSE' : 'MIRI'}
+                            </span>
+                          )}
+                          <span className="text-xs text-gray-500">
+                            {new Date(user.acceptanceLetterGeneratedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 bg-gray-100/70 text-gray-600 border border-gray-300 rounded-full px-2.5 py-1 text-xs font-semibold">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          Not Sent
+                        </span>
                       )}
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
