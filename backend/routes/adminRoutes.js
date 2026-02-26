@@ -62,17 +62,20 @@ router.get("/users", async (req, res) => {
 
     console.log(`Usuarios obtenidos: ${users.length}`);
 
-    // Add acceptance letter information for each user
-    const usersWithAcceptanceLetter = await Promise.all(
-      users.map(async (user) => {
-        const application = await Application.findOne({ userId: user._id }).select('acceptanceLetterGeneratedAt acceptanceLetterProgramType');
-        return {
-          ...user.toObject(),
-          acceptanceLetterGeneratedAt: application?.acceptanceLetterGeneratedAt || null,
-          acceptanceLetterProgramType: application?.acceptanceLetterProgramType || null,
-        };
-      })
-    );
+    // Add acceptance letter information: single query instead of N+1
+    const userIds = users.map((u) => u._id);
+    const applications = await Application.find({ userId: { $in: userIds } })
+      .select("userId acceptanceLetterGeneratedAt acceptanceLetterProgramType")
+      .lean();
+    const appByUserId = new Map(applications.map((a) => [a.userId.toString(), a]));
+    const usersWithAcceptanceLetter = users.map((user) => {
+      const app = appByUserId.get(user._id.toString());
+      return {
+        ...user.toObject(),
+        acceptanceLetterGeneratedAt: app?.acceptanceLetterGeneratedAt ?? null,
+        acceptanceLetterProgramType: app?.acceptanceLetterProgramType ?? null,
+      };
+    });
 
     res.json({
       users: usersWithAcceptanceLetter,
