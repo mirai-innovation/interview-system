@@ -179,6 +179,8 @@ export default function AdminInvoiceStats() {
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">User</th>
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Start</th>
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">End</th>
+                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Weeks</th>
+                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Discount %</th>
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Payment deadline</th>
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Total (USD)</th>
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Status</th>
@@ -193,6 +195,10 @@ export default function AdminInvoiceStats() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.startDate)}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.endDate)}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-700">{row.weeks != null ? row.weeks : '—'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {row.scholarshipPercentage != null && row.scholarshipPercentage > 0 ? `${row.scholarshipPercentage}%` : '—'}
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.paymentDeadline)}</td>
                       <td className="px-4 py-3 font-semibold text-gray-900">
                         ${(row.total ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}

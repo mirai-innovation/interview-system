@@ -199,15 +199,15 @@ export function streamInvoicePdf(res, user, application) {
 
   // ----- Total (prominent, right) -----
   doc.font("Helvetica-Bold").fontSize(11);
-  doc.text(`Total ${formatUSD(breakdown.total)}`, margin, billedBottom + 16, { align: "right", width: textWidth });
+  doc.text(`Total ${formatUSD(breakdown.total)}`, margin, billedBottom + 10, { align: "right", width: textWidth });
 
   // ----- Table: Description | Amount -----
-  const tableTop = billedBottom + 44;
+  const tableTop = billedBottom + 32;
   const col1X = margin;
   const col2X = pageWidth - margin - 130;
   const col2Width = 130;
   const descWidth = col2X - col1X - 16;
-  const rowHeight = 20;
+  const rowHeight = 18;
 
   // Table header (bold)
   doc.font("Helvetica-Bold").fontSize(10);
@@ -218,7 +218,7 @@ export function streamInvoicePdf(res, user, application) {
   doc.moveTo(margin, tableTop + rowHeight).lineTo(pageWidth - margin, tableTop + rowHeight).stroke();
   doc.lineWidth(1);
 
-  let rowY = tableTop + rowHeight + 10;
+  let rowY = tableTop + rowHeight + 6;
   doc.font("Helvetica").fontSize(9);
 
   // Row 1: Tuition (description may wrap to avoid overlap)
@@ -227,7 +227,7 @@ export function streamInvoicePdf(res, user, application) {
     : `${weeks} week(s)`;
   const tuitionDesc = `Mirai Innovation Research Immersion (MIRI) Program. Academic training tuition fee for ${weeks} week(s) (${weeks} × $${breakdown.tuitionPerWeek} USD). Course period: ${periodStr}.`;
   doc.text(tuitionDesc, col1X, rowY, { width: descWidth });
-  const tuitionRowBottom = doc.y + 6;
+  const tuitionRowBottom = doc.y + 4;
   doc.text(formatUSD(breakdown.tuitionBeforeScholarship), col2X, rowY, { width: col2Width, align: "right" });
   rowY = Math.max(rowY + rowHeight, tuitionRowBottom);
 
@@ -257,19 +257,19 @@ export function streamInvoicePdf(res, user, application) {
   doc.font("Helvetica");
 
   // ----- Payment Terms -----
-  rowY += rowHeight + 18;
+  rowY += rowHeight + 10;
   doc.font("Helvetica-Bold").fontSize(10).text("Payment Terms:", margin, rowY);
   doc.font("Helvetica").fontSize(9);
   
   // Payment Terms Table
-  const paymentTableTop = rowY + 20;
+  const paymentTableTop = rowY + 12;
   const paymentCol1X = margin; // Description column
   const paymentCol2X = col2X - 100; // Amount column
   const paymentCol2Width = 100;
   const paymentCol3X = col2X; // Deadline column
   const paymentCol3Width = col2Width;
   const paymentDescWidth = paymentCol2X - paymentCol1X - 12;
-  const paymentRowHeight = 16;
+  const paymentRowHeight = 14;
 
   // Table header
   doc.font("Helvetica-Bold").fontSize(9);
@@ -283,14 +283,14 @@ export function streamInvoicePdf(res, user, application) {
   doc.lineWidth(1);
 
   // Table rows
-  let paymentRowY = paymentTableTop + paymentRowHeight + 8;
+  let paymentRowY = paymentTableTop + paymentRowHeight + 4;
   doc.font("Helvetica").fontSize(9);
   
   // Row 1: Registration
   doc.text("1st Payment: Registration", paymentCol1X, paymentRowY, { width: paymentDescWidth });
   doc.text(formatUSD(REGISTRATION_FEE_DISPLAY), paymentCol2X, paymentRowY, { width: paymentCol2Width, align: "right" });
   doc.fillColor(RED).text("PAID ONLINE", paymentCol3X, paymentRowY, { width: paymentCol3Width, align: "right" }).fillColor("black");
-  paymentRowY += paymentRowHeight + 4;
+  paymentRowY += paymentRowHeight + 2;
   
   // Row 2: Tuition
   doc.text("2nd Payment: Tuition", paymentCol1X, paymentRowY, { width: paymentDescWidth });
@@ -302,17 +302,34 @@ export function streamInvoicePdf(res, user, application) {
   rowY = paymentRowY + paymentRowHeight;
 
   // ----- Payment to: exact bank data (hardcoded) -----
-  rowY += 28;
+  rowY += 14;
   doc.font("Helvetica-Bold").fontSize(10).text("Payment to:", margin, rowY);
-  doc.font("Helvetica").fontSize(9);
-  const bankY = rowY + 12;
+  doc.font("Helvetica").fontSize(8);
+  const bankY = rowY + 10;
   doc.text(`Bank name: ${BANK_DETAILS.bankName}`, margin, bankY);
-  doc.text(`Branch name: ${BANK_DETAILS.branchName}`, margin, doc.y + 10);
-  doc.text(`Branch address: ${BANK_DETAILS.branchAddress}`, margin, doc.y + 10);
-  doc.text(`SWIFT: ${BANK_DETAILS.swift}`, margin, doc.y + 10);
-  doc.text(`Account: ${BANK_DETAILS.account}`, margin, doc.y + 10);
-  doc.text(`Receiver: ${BANK_DETAILS.receiver}`, margin, doc.y + 10);
-  doc.text(`Address: ${BANK_DETAILS.receiverAddress}`, margin, doc.y + 10);
+  doc.text(`Branch name: ${BANK_DETAILS.branchName}`, margin, doc.y + 6);
+  doc.text(`Branch address: ${BANK_DETAILS.branchAddress}`, margin, doc.y + 6);
+  doc.text(`SWIFT: ${BANK_DETAILS.swift}`, margin, doc.y + 6);
+  doc.text(`Account: ${BANK_DETAILS.account}`, margin, doc.y + 6);
+  doc.text(`Receiver: ${BANK_DETAILS.receiver}`, margin, doc.y + 6);
+  doc.text(`Address: ${BANK_DETAILS.receiverAddress}`, margin, doc.y + 6);
+
+  // ----- Notice: credit card option and contact (compact to fit one page) -----
+  let noticeY = doc.y + 8;
+  doc.font("Helvetica").fontSize(6).fillColor("#333333");
+  doc.text(
+    "If you prefer to make the payment online by credit card, this option is also available. Please note that the payment gateway applies an additional 3.6% processing fee, which will be added to the total transfer amount. If you would like to proceed with this option, kindly inform us and we will generate and send you the secure payment link.",
+    margin,
+    noticeY,
+    { align: "left", width: textWidth, lineGap: 1 }
+  );
+  doc.text(
+    "Should you have any questions or require assistance, please do not hesitate to contact us at contact@mirai-innovation-lab.com",
+    margin,
+    doc.y + 2,
+    { align: "left", width: textWidth, lineGap: 1 }
+  );
+  doc.fillColor("black");
 
   doc.end();
 }

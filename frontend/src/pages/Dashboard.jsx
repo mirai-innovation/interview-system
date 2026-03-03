@@ -170,7 +170,7 @@ const Dashboard = () => {
             </div>
           </div>
           <ApplicationStepper applicationStatus={applicationStatus} onDownloadAcceptanceLetterSuccess={fetchApplicationStatus} />
-          {profile?.program === 'MIRI' && applicationStatus?.step4Completed && (
+          {profile?.program === 'MIRI' && (applicationStatus?.step4Completed || (applicationStatus?.invoiceDateRange?.startDate && applicationStatus?.invoiceDateRange?.endDate)) && (
             <ConfirmDatesSection applicationStatus={applicationStatus} onSuccess={fetchApplicationStatus} />
           )}
         </div>
