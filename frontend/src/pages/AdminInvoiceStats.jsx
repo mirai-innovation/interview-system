@@ -31,6 +31,40 @@ export default function AdminInvoiceStats() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [downloadingUserId, setDownloadingUserId] = useState(null);
+  const [exportingExcel, setExportingExcel] = useState(false);
+
+  const handleDownloadExcel = async () => {
+    setExportingExcel(true);
+    try {
+      const response = await api.get('/admin/invoice-stats/export', { responseType: 'blob' });
+      const disposition = response.headers['content-disposition'];
+      const fileNameMatch = disposition?.match(/filename="?([^"]+)"?/);
+      const fileName = fileNameMatch?.[1] || `MIRI_Invoices_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      if (err.response?.data instanceof Blob) {
+        err.response.data.text().then((text) => {
+          try {
+            const jsonError = JSON.parse(text);
+            alert(jsonError.message || 'Error downloading Excel.');
+          } catch {
+            alert('Error downloading Excel.');
+          }
+        });
+      } else {
+        alert(err.response?.data?.message || 'Error downloading Excel.');
+      }
+    } finally {
+      setExportingExcel(false);
+    }
+  };
 
   const handleDownloadInvoice = async (userId, userName) => {
     setDownloadingUserId(userId);
@@ -251,9 +285,22 @@ export default function AdminInvoiceStats() {
 
         {/* Table */}
         <div className="glass-card overflow-hidden">
-          <div className="p-6 border-b border-gray-200/60">
-            <h2 className="text-lg font-semibold text-gray-900">Invoices list</h2>
-            <p className="text-sm text-gray-500">User, dates, payment deadline and total per MIRI invoice</p>
+          <div className="p-6 border-b border-gray-200/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Invoices list</h2>
+              <p className="text-sm text-gray-500">User, dates, payment deadline and total per MIRI invoice</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleDownloadExcel}
+              disabled={exportingExcel || list.length === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              {exportingExcel ? 'Downloading…' : 'Download Excel'}
+            </button>
           </div>
           <div className="overflow-x-auto">
             {list.length === 0 ? (

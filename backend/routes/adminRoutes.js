@@ -703,79 +703,137 @@ function computeInvoiceTotal(weeks, scholarshipPercentage = 0) {
   return Math.round((subtotal + tax) * 100) / 100;
 }
 
+// Shared: fetch invoice stats list + summary (for JSON and Excel export)
+async function getInvoiceStatsData() {
+  const applications = await Application.find({
+    "invoiceDateRange.startDate": { $exists: true, $ne: null },
+    "invoiceDateRange.endDate": { $exists: true, $ne: null },
+  })
+    .populate("userId", "name email program")
+    .sort({ "invoiceDateRange.startDate": 1 })
+    .lean();
+
+  const list = [];
+  const revenueByMonth = {}; // { "YYYY-MM": total }
+  const studentsByMonth = {}; // { "YYYY-MM": count }
+  let totalApprovedRevenue = 0;
+  let totalPendingRevenue = 0;
+
+  for (const app of applications) {
+    const user = app.userId;
+    if (!user || user.program !== "MIRI") continue;
+
+    const startDate = app.invoiceDateRange?.startDate;
+    const endDate = app.invoiceDateRange?.endDate;
+    if (!startDate || !endDate) continue;
+
+    const start = new Date(startDate);
+    const paymentDeadline = new Date(start);
+    paymentDeadline.setMonth(paymentDeadline.getMonth() - 1);
+
+    const weeks = getWeeksBetween(startDate, endDate);
+    const scholarshipPercentage = app.scholarshipPercentage ?? 0;
+    const total = computeInvoiceTotal(weeks, scholarshipPercentage);
+
+    const startMonthKey = start.toISOString().slice(0, 7);
+    const payMonthKey = paymentDeadline.toISOString().slice(0, 7);
+    studentsByMonth[startMonthKey] = (studentsByMonth[startMonthKey] || 0) + 1;
+    revenueByMonth[payMonthKey] = (revenueByMonth[payMonthKey] || 0) + total;
+
+    if (app.invoiceStatus === "approved") totalApprovedRevenue += total;
+    else if (app.invoiceStatus === "pending") totalPendingRevenue += total;
+
+    list.push({
+      userId: user._id,
+      userName: user.name,
+      userEmail: user.email,
+      startDate: startDate,
+      endDate: endDate,
+      paymentDeadline: paymentDeadline.toISOString(),
+      weeks,
+      scholarshipPercentage,
+      total,
+      invoiceStatus: app.invoiceStatus || "pending",
+      paymentProofStatus: app.paymentProofStatus || null,
+      isPaid: app.paymentProofStatus === "approved",
+    });
+  }
+
+  const summary = {
+    totalApprovedRevenue,
+    totalPendingRevenue,
+    totalInvoices: list.length,
+    revenueByMonth: Object.entries(revenueByMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, value]) => ({ month, value })),
+    studentsByMonth: Object.entries(studentsByMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, count]) => ({ month, count })),
+  };
+
+  return { list, summary };
+}
+
+function formatDateForExport(d) {
+  if (!d) return "—";
+  const date = new Date(d);
+  return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
 // Invoice statistics: list of invoices + aggregates for charts (admin only)
 router.get("/invoice-stats", async (req, res) => {
   try {
-    const applications = await Application.find({
-      "invoiceDateRange.startDate": { $exists: true, $ne: null },
-      "invoiceDateRange.endDate": { $exists: true, $ne: null },
-    })
-      .populate("userId", "name email program")
-      .sort({ "invoiceDateRange.startDate": 1 })
-      .lean();
-
-    const list = [];
-    const revenueByMonth = {}; // { "YYYY-MM": total }
-    const studentsByMonth = {}; // { "YYYY-MM": count }
-    let totalApprovedRevenue = 0;
-    let totalPendingRevenue = 0;
-
-    for (const app of applications) {
-      const user = app.userId;
-      if (!user || user.program !== "MIRI") continue;
-
-      const startDate = app.invoiceDateRange?.startDate;
-      const endDate = app.invoiceDateRange?.endDate;
-      if (!startDate || !endDate) continue;
-
-      const start = new Date(startDate);
-      const paymentDeadline = new Date(start);
-      paymentDeadline.setMonth(paymentDeadline.getMonth() - 1);
-
-      const weeks = getWeeksBetween(startDate, endDate);
-      const scholarshipPercentage = app.scholarshipPercentage ?? 0;
-      const total = computeInvoiceTotal(weeks, scholarshipPercentage);
-
-      const startMonthKey = start.toISOString().slice(0, 7);
-      const payMonthKey = paymentDeadline.toISOString().slice(0, 7);
-      studentsByMonth[startMonthKey] = (studentsByMonth[startMonthKey] || 0) + 1;
-      revenueByMonth[payMonthKey] = (revenueByMonth[payMonthKey] || 0) + total;
-
-      if (app.invoiceStatus === "approved") totalApprovedRevenue += total;
-      else if (app.invoiceStatus === "pending") totalPendingRevenue += total;
-
-      list.push({
-        userId: user._id,
-        userName: user.name,
-        userEmail: user.email,
-        startDate: startDate,
-        endDate: endDate,
-        paymentDeadline: paymentDeadline.toISOString(),
-        weeks,
-        scholarshipPercentage,
-        total,
-        invoiceStatus: app.invoiceStatus || "pending",
-        paymentProofStatus: app.paymentProofStatus || null,
-        isPaid: app.paymentProofStatus === "approved",
-      });
-    }
-
-    const summary = {
-      totalApprovedRevenue,
-      totalPendingRevenue,
-      totalInvoices: list.length,
-      revenueByMonth: Object.entries(revenueByMonth)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([month, value]) => ({ month, value })),
-      studentsByMonth: Object.entries(studentsByMonth)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([month, count]) => ({ month, count })),
-    };
-
+    const { list, summary } = await getInvoiceStatsData();
     res.json({ list, summary });
   } catch (error) {
     console.error("Error fetching invoice stats:", error);
     res.status(500).json({ message: "Error fetching invoice statistics" });
+  }
+});
+
+// Export invoices list to Excel (admin only)
+router.get("/invoice-stats/export", async (req, res) => {
+  try {
+    const { list } = await getInvoiceStatsData();
+    const frontendBase = (process.env.FRONTEND_URL || "").replace(/\/$/, "");
+    const rows = list.map((row) => ({
+      "User Name": row.userName ?? "—",
+      "User Email": row.userEmail ?? "—",
+      "Start Date": formatDateForExport(row.startDate),
+      "End Date": formatDateForExport(row.endDate),
+      Weeks: row.weeks ?? "—",
+      "Scholarship %": row.scholarshipPercentage != null && row.scholarshipPercentage > 0 ? `${row.scholarshipPercentage}%` : "—",
+      "Payment Deadline": formatDateForExport(row.paymentDeadline),
+      "Total (USD)": row.total != null ? Number(row.total).toFixed(2) : "—",
+      "Invoice Status": row.invoiceStatus ?? "—",
+      "Payment Proof Status": row.paymentProofStatus ?? "—",
+      Paid: row.isPaid ? "Yes" : "No",
+      "Invoice PDF (link)": frontendBase ? `${frontendBase}/admin/invoice-stats/download-pdf/${row.userId}` : "—",
+    }));
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // Make "Invoice PDF (link)" column clickable hyperlinks where we have a URL
+    const colIndex = Object.keys(rows[0] || {}).indexOf("Invoice PDF (link)");
+    if (colIndex >= 0 && rows.length > 0) {
+      const colLetter = XLSX.utils.encode_col(colIndex);
+      rows.forEach((row, i) => {
+        const url = row["Invoice PDF (link)"];
+        if (url && url !== "—") {
+          const ref = `${colLetter}${i + 2}`; // +2: 1-based row, and row 1 is header
+          if (!ws[ref]) return;
+          ws[ref].l = { Target: url, Tooltip: "Download invoice PDF" };
+        }
+      });
+    }
+    XLSX.utils.book_append_sheet(wb, ws, "Invoices");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    const filename = `MIRI_Invoices_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.send(buf);
+  } catch (error) {
+    console.error("Error exporting invoice stats to Excel:", error);
+    res.status(500).json({ message: "Error exporting invoices to Excel" });
   }
 });
 

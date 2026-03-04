@@ -11,6 +11,7 @@ import Interview from './pages/Interview';
 import Results from './pages/Results';
 import AdminPanel from './pages/AdminPanel';
 import AdminInvoiceStats from './pages/AdminInvoiceStats';
+import AdminInvoicePdfDownload from './pages/AdminInvoicePdfDownload';
 import ApplicationForm from './pages/ApplicationForm';
 import ScheduleScreening from './pages/ScheduleScreening';
 import ReportProblem from './pages/ReportProblem';
@@ -89,6 +90,14 @@ function App() {
             element={
               <AdminRoute>
                 <AdminInvoiceStats />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/invoice-stats/download-pdf/:userId"
+            element={
+              <AdminRoute>
+                <AdminInvoicePdfDownload />
               </AdminRoute>
             }
           />
