@@ -26,6 +26,7 @@ Thumbs.db
 .idea/
 *.sublime-project
 *.sublime-workspace
+.claude/
 
 # Uploads (heavy files - videos, PDFs, etc.)
 backend/uploads/
