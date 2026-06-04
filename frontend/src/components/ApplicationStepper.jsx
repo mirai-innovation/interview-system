@@ -25,7 +25,7 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
       description: 'Upload your CV and generate personalized interview questions',
       route: '/cv-upload',
       completed: cvAnalyzed,
-      available: true,
+      available: step1Completed,
     },
     {
       id: 2,
@@ -33,12 +33,12 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
       description: 'Answer personalized interview questions',
       route: '/interview',
       completed: step2Completed,
-      available: cvAnalyzed, // Only after CV has been analyzed
+      available: step1Completed && cvAnalyzed,
     },
     {
       id: 4,
-      title: 'Acceptance Letter',
-      description: 'Download your acceptance letter (available after admin generates it)',
+      title: 'Decision Letter',
+      description: 'Available after the committee evaluation',
       route: null,
       completed: step4Completed,
       available: !!acceptanceLetterGeneratedAt,

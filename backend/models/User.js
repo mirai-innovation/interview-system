@@ -5,9 +5,9 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true },
     email: { type: String, unique: true, required: true },
     password: { type: String, required: true },
-    dob: { type: Date, required: true },
-    gender: { type: String, required: true },
-    academic_level: { type: String, required: true },
+    dob: { type: Date },
+    gender: { type: String },
+    academic_level: { type: String },
     program: { type: String, enum: ['MIRI', 'EMFUTECH', 'JCTI', 'MIRAITEACH', 'FUTURE_INNOVATORS_JAPAN', 'OTHER'], required: false },
     digitalId: { type: String, unique: true }, // Formato: PROGRAMA-AÑO-NÚMERO (ej: MIRI-2025-1)
     role: { type: String, enum: ['user', 'admin'], default: 'user' },

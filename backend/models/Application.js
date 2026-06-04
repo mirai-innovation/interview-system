@@ -50,6 +50,7 @@ const applicationSchema = new mongoose.Schema(
       enum: ['A0/A1', 'A2', 'B1', 'B2', 'C1', 'C2', ''] 
     },
     hasEnglishCertification: { type: Boolean, default: false },
+    otherLanguage: { type: String, default: '' },
     
     // Section 5: Program Specifics (EmFuTech)
     appliedBefore: { type: Boolean, default: false },

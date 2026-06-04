@@ -82,14 +82,23 @@ const ApplicationForm = () => {
   const [error, setError] = useState('');
   const [activeSection, setActiveSection] = useState(1);
 
+  const splitName = (fullName) => {
+    if (!fullName) return { firstName: '', lastName: '' };
+    const parts = fullName.trim().split(/\s+/);
+    return {
+      firstName: parts[0] || '',
+      lastName: parts.slice(1).join(' ') || '',
+    };
+  };
+
   const [formData, setFormData] = useState({
     // Section 1: Basic Info
     email: user?.email || '',
     promotionalCode: '',
-    
+
     // Section 2: Personal & Contact
-    firstName: '',
-    lastName: '',
+    firstName: splitName(user?.name).firstName,
+    lastName: splitName(user?.name).lastName,
     sex: '',
     dateOfBirth: '',
     countryOfCitizenship: '',
@@ -114,6 +123,7 @@ const ApplicationForm = () => {
     // Section 4: Language
     englishLevel: '',
     hasEnglishCertification: false,
+    otherLanguage: '',
     
     // Section 5: Program Specifics
     appliedBefore: false,
@@ -125,9 +135,17 @@ const ApplicationForm = () => {
   });
 
   useEffect(() => {
-    // Always set email from user when available
+    // Always set email from user when available, and prefill first/last name if empty
     if (user?.email) {
-      setFormData(prev => ({ ...prev, email: user.email }));
+      setFormData(prev => {
+        const next = { ...prev, email: user.email };
+        if (!prev.firstName && !prev.lastName && user?.name) {
+          const { firstName, lastName } = splitName(user.name);
+          next.firstName = firstName;
+          next.lastName = lastName;
+        }
+        return next;
+      });
     }
     fetchApplicationData();
   }, [user]);
@@ -147,8 +165,8 @@ const ApplicationForm = () => {
           ...prev,
           email: user?.email || response.data.email || prev.email, // Always prioritize user email from auth
           promotionalCode: response.data.promotionalCode || '',
-          firstName: response.data.firstName || '',
-          lastName: response.data.lastName || '',
+          firstName: response.data.firstName || splitName(user?.name).firstName,
+          lastName: response.data.lastName || splitName(user?.name).lastName,
           sex: response.data.sex || '',
           dateOfBirth: response.data.dateOfBirth ? new Date(response.data.dateOfBirth).toISOString().split('T')[0] : '',
           countryOfCitizenship: response.data.countryOfCitizenship || '',
@@ -169,6 +187,7 @@ const ApplicationForm = () => {
           hasAcademicPublications: response.data.hasAcademicPublications || false,
           englishLevel: response.data.englishLevel || '',
           hasEnglishCertification: response.data.hasEnglishCertification || false,
+          otherLanguage: response.data.otherLanguage || '',
           appliedBefore: response.data.appliedBefore || false,
           paymentSource: response.data.paymentSource || '',
           plagiarismCheckConfirmed: response.data.plagiarismCheckConfirmed || false,
@@ -444,6 +463,7 @@ const ApplicationForm = () => {
                   type="email"
                   required
                   disabled
+                  value={formData.email || user?.email || ''}
                   formData={formData}
                   handleChange={handleChange}
                 />
@@ -549,6 +569,9 @@ const ApplicationForm = () => {
                   />
                 </div>
                 <div className="mt-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Do you have any medical condition or disability we should be aware of?
+                  </label>
                   <InputField
                     name="hasMedicalCondition"
                     type="checkbox"
@@ -583,15 +606,6 @@ const ApplicationForm = () => {
                   Academic Background
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InputField
-                    label="CV URL"
-                    name="cvUrl"
-                    type="url"
-                    placeholder="https://example.com/cv.pdf"
-                    colSpan={2}
-                    formData={formData}
-                    handleChange={handleChange}
-                  />
                   <InputField
                     label="Institution Name"
                     name="institutionName"
@@ -651,6 +665,9 @@ const ApplicationForm = () => {
                   />
                 </div>
                 <div className="mt-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Do you have any academic publications (papers, articles, conference proceedings, etc.)?
+                  </label>
                   <InputField
                     name="hasAcademicPublications"
                     type="checkbox"
@@ -679,12 +696,30 @@ const ApplicationForm = () => {
                     name="englishLevel"
                     type="select"
                     required
-                    options={['A0/A1', 'A2', 'B1', 'B2', 'C1', 'C2']}
+                    options={[
+                      { value: 'A0/A1', label: 'A0/A1 — Beginner (basic words and phrases)' },
+                      { value: 'A2', label: 'A2 — Elementary (simple everyday conversations)' },
+                      { value: 'B1', label: 'B1 — Intermediate (familiar topics, travel situations)' },
+                      { value: 'B2', label: 'B2 — Upper Intermediate (fluent, complex topics)' },
+                      { value: 'C1', label: 'C1 — Advanced (fluent and spontaneous, professional use)' },
+                      { value: 'C2', label: 'C2 — Proficient (near-native, mastery of the language)' },
+                    ]}
+                    formData={formData}
+                    handleChange={handleChange}
+                  />
+                  <InputField
+                    label="Other Language (optional)"
+                    name="otherLanguage"
+                    type="text"
+                    placeholder="e.g., Spanish (B2), Japanese (A2)"
                     formData={formData}
                     handleChange={handleChange}
                   />
                 </div>
                 <div className="mt-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Do you have any official English certification (TOEFL, IELTS, Cambridge, etc.)?
+                  </label>
                   <InputField
                     name="hasEnglishCertification"
                     type="checkbox"
@@ -719,13 +754,31 @@ const ApplicationForm = () => {
                   />
                 </div>
                 <div className="mt-6">
-                  <InputField
-                    name="appliedBefore"
-                    type="checkbox"
-                    label="Yes, I have applied before"
-                    formData={formData}
-                    handleChange={handleChange}
-                  />
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Have you applied to this program before?
+                  </label>
+                  <div className="flex gap-6">
+                    <label className="flex items-center gap-2 text-gray-700 text-sm">
+                      <input
+                        type="radio"
+                        name="appliedBefore"
+                        checked={formData.appliedBefore === true}
+                        onChange={() => handleChange({ target: { name: 'appliedBefore', type: 'checkbox', checked: true } })}
+                        className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                      />
+                      Yes, I have applied before
+                    </label>
+                    <label className="flex items-center gap-2 text-gray-700 text-sm">
+                      <input
+                        type="radio"
+                        name="appliedBefore"
+                        checked={formData.appliedBefore === false}
+                        onChange={() => handleChange({ target: { name: 'appliedBefore', type: 'checkbox', checked: false } })}
+                        className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                      />
+                      No, this is my first time
+                    </label>
+                  </div>
                 </div>
               </div>
             )}

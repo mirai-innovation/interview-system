@@ -51,6 +51,7 @@ const Interview = () => {
   // Retake and language states (from main)
   const [retakeUsed, setRetakeUsed] = useState({}); // Track if retake has been used for each question index
   const [selectedLanguage, setSelectedLanguage] = useState('en'); // Language for transcription: 'en' or 'es'
+  const [userProgram, setUserProgram] = useState('');
   
   // Summary and retake flow states (from main)
   const [showSummary, setShowSummary] = useState(false); // Show summary before submit
@@ -245,8 +246,12 @@ const Interview = () => {
       if (response.data.questions && response.data.questions.length > 0) {
         const generatedQuestions = response.data.questions;
         // Get default questions based on user's program
-        const userProgram = response.data.program || '';
-        const defaultQuestions = getDefaultQuestions(userProgram);
+        const fetchedProgram = response.data.program || '';
+        setUserProgram(fetchedProgram);
+        if (fetchedProgram === 'EMFUTECH') {
+          setSelectedLanguage('en');
+        }
+        const defaultQuestions = getDefaultQuestions(fetchedProgram);
         // Combine generated questions with default questions
         const combinedQuestions = [...generatedQuestions, ...defaultQuestions];
         setQuestions(generatedQuestions);
@@ -1573,7 +1578,9 @@ const Interview = () => {
       });
       
       setMessage('Interview submitted successfully');
-      // Show satisfaction survey instead of redirecting immediately (from main)
+      // Mark interview as completed and show satisfaction survey
+      setInterviewCompleted(true);
+      setReadyToSubmit(false);
       setShowSatisfactionSurvey(true);
     } catch (err) {
       setError(err.response?.data?.message || 'Error submitting interview');
@@ -1756,7 +1763,8 @@ const Interview = () => {
               </div>
             ) : null}
 
-            {/* Language Selection (from main) */}
+            {/* Language Selection (hidden for EMFUTECH - English only) */}
+            {userProgram !== 'EMFUTECH' && (
             <div className="glass-card bg-gradient-to-br from-blue-50/80 to-purple-50/80 border border-blue-200/50 rounded-2xl p-6 sm:p-8 mb-8">
               <h3 className="font-bold text-gray-900 mb-4 sm:mb-6 text-lg sm:text-xl flex items-center gap-2">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1813,6 +1821,7 @@ const Interview = () => {
                 </button>
               </div>
             </div>
+            )}
 
             {/* Instructions Card */}
             <div className="glass-card bg-gradient-to-br from-blue-50/80 to-purple-50/80 border border-blue-200/50 rounded-2xl p-6 sm:p-8 mb-8">
@@ -2179,6 +2188,10 @@ const Interview = () => {
               if (answerSaved && !isReviewMode && !isTranscribing) {
                 // Si es la última pregunta de texto
                 if (isLastTextQuestion) {
+                  // Hide submit branch entirely once the interview has been submitted
+                  if (interviewCompleted || showSatisfactionSurvey) {
+                    return null;
+                  }
                   // Si ya seleccionaron "submit", mostrar botón de submit (from main)
                   if (readyToSubmit) {
                     return (
@@ -2186,7 +2199,7 @@ const Interview = () => {
                         <div className="flex items-center justify-center">
                           <button
                             type="submit"
-                            disabled={submitting}
+                            disabled={submitting || interviewCompleted || showSatisfactionSurvey}
                             className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-full px-6 sm:px-8 py-3 sm:py-4 font-bold text-base sm:text-lg shadow-xl hover:shadow-2xl transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {submitting ? 'Submitting...' : 'Submit Interview'}

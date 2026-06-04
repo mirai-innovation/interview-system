@@ -155,9 +155,13 @@ const CVUpload = () => {
           'Content-Type': 'multipart/form-data',
         },
       });
-      setMessage('CV uploaded successfully');
-      await fetchProfile();
+      setMessage('CV uploaded successfully. Starting analysis...');
       setFile(null);
+      setUploading(false);
+      // Auto-start analysis right after upload
+      await handleAnalyze();
+      await fetchProfile();
+      return;
     } catch (err) {
       setError(err.response?.data?.message || 'Error uploading CV');
     } finally {

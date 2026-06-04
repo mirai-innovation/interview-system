@@ -47,3 +47,6 @@ coverage/
 # Documentation files (except README.md)
 *.md
 !README.md
+
+# Análisis local del proyecto (no versionar)
+project_analysis.md
