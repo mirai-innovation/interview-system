@@ -2133,15 +2133,19 @@ const Interview = () => {
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
                       {/* Hide play button if auto-starting or if already recording */}
                       {!isRecording && !recordedVideo && !shouldAutoStartRecording ? (
-                        <button
-                          type="button"
-                          onClick={startUnifiedRecording}
-                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shadow-xl hover:shadow-2xl transition-all hover:scale-110"
-                        >
-                          <svg className="w-8 h-8 sm:w-10 sm:h-10" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                          </svg>
-                        </button>
+                        <div className="flex flex-col items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={startUnifiedRecording}
+                            aria-label="Start my answer"
+                            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shadow-xl hover:shadow-2xl transition-all hover:scale-110"
+                          >
+                            <svg className="w-8 h-8 sm:w-10 sm:h-10" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                          <span className="text-sm sm:text-base font-semibold text-gray-700">Start my answer</span>
+                        </div>
                       ) : isRecording ? (
                         <button
                           type="button"
@@ -2256,15 +2260,19 @@ const Interview = () => {
                       {/* Main Record/Stop Button (Center) */}
                       {/* Hide play button if auto-starting or if already recording */}
                       {!isRecording && !recordedVideo && !shouldAutoStartRecording ? (
-                        <button
-                          type="button"
-                          onClick={startUnifiedRecording}
-                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shadow-xl hover:shadow-2xl transition-all hover:scale-110"
-                        >
-                          <svg className="w-8 h-8 sm:w-10 sm:h-10" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                          </svg>
-                        </button>
+                        <div className="flex flex-col items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={startUnifiedRecording}
+                            aria-label="Start my answer"
+                            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shadow-xl hover:shadow-2xl transition-all hover:scale-110"
+                          >
+                            <svg className="w-8 h-8 sm:w-10 sm:h-10" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                          <span className="text-sm sm:text-base font-semibold text-gray-700">Start my answer</span>
+                        </div>
                       ) : isRecording ? (
                         <button
                           type="button"

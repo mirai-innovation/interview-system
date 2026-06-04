@@ -129,7 +129,7 @@ const Navbar = () => {
                       to="/report" 
                       className="text-gray-700 hover:text-blue-600 font-medium transition px-3 py-2 rounded-lg hover:bg-white/50"
                     >
-                      Report
+                      Support
                     </Link>
                   </>
                 )}
