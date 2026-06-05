@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import api from '../utils/axios';
 import ApplicationStepper from '../components/ApplicationStepper';
 import ConfirmDatesSection from '../components/ConfirmDatesSection';
+import RegisterPaymentSection from '../components/RegisterPaymentSection';
 
 // Circular progress (same style as main / Results)
 const CircularProgress = ({ percentage, size = 120, color = 'blue' }) => {
@@ -140,11 +141,15 @@ const Dashboard = () => {
     );
   }
 
-  // Match ApplicationStepper: Application Form, CV upload, AI Interview, Acceptance Letter
-  const activeStepsTotal = 4;
-  const activeStepsCompleted = applicationStatus
+  // Match ApplicationStepper: Application Form, CV upload, AI Interview, Decision Letter, Register Payment
+  // (Register Payment only applies to MIRI/EMFUTECH; for other programs the journey caps at 4)
+  const isPaymentProgram = profile?.program === 'MIRI' || profile?.program === 'EMFUTECH';
+  const activeStepsTotal = isPaymentProgram ? 5 : 4;
+  const baseCompleted = applicationStatus
     ? [applicationStatus.step1Completed, applicationStatus.cvAnalyzed, applicationStatus.step2Completed, applicationStatus.step4Completed].filter(Boolean).length
     : 0;
+  const paymentCompleted = isPaymentProgram && applicationStatus?.paymentProofStatus === 'approved' ? 1 : 0;
+  const activeStepsCompleted = baseCompleted + paymentCompleted;
   const journeyPercentage = activeStepsTotal ? Math.round((activeStepsCompleted / activeStepsTotal) * 100) : 0;
 
   return (
@@ -169,9 +174,16 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
-          <ApplicationStepper applicationStatus={applicationStatus} onDownloadAcceptanceLetterSuccess={fetchApplicationStatus} />
+          <ApplicationStepper applicationStatus={applicationStatus} onDownloadAcceptanceLetterSuccess={fetchApplicationStatus} program={profile?.program} />
           {profile?.program === 'MIRI' && (applicationStatus?.step4Completed || (applicationStatus?.invoiceDateRange?.startDate && applicationStatus?.invoiceDateRange?.endDate)) && (
             <ConfirmDatesSection applicationStatus={applicationStatus} onSuccess={fetchApplicationStatus} />
+          )}
+          {(profile?.program === 'MIRI' || profile?.program === 'EMFUTECH') && applicationStatus?.step4Completed && (
+            <RegisterPaymentSection
+              applicationStatus={applicationStatus}
+              program={profile?.program}
+              onSuccess={fetchApplicationStatus}
+            />
           )}
         </div>
 

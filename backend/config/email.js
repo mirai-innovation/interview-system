@@ -689,9 +689,11 @@ export const sendAcceptanceLetterReadyNotification = async (userEmail, userName,
     const finalDashboardUrl = (dashboardUrl || `${portalBase.replace(/\/$/, '')}/dashboard`).trim();
     const safeDashboardUrl = escapeHtml(finalDashboardUrl);
 
-    const programName = programType === 'FIJSE' 
+    const programName = programType === 'FIJSE'
       ? 'Future Innovators Japan Selection Entry Program'
-      : 'Mirai Innovation Research Immersion (MIRI) Program';
+      : programType === 'EMFUTECH'
+        ? 'EMFUTECH Program'
+        : 'Mirai Innovation Research Immersion (MIRI) Program';
     const safeProgramName = escapeHtml(programName);
 
     // Different content for FIJSE vs MIRI

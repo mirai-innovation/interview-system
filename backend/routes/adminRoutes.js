@@ -840,6 +840,41 @@ router.get("/invoice-stats/export", async (req, res) => {
   }
 });
 
+// List users awaiting decision letter (interview submitted, no acceptance letter yet)
+router.get("/pending-decision-letters", async (req, res) => {
+  try {
+    // Find applications that are submitted (not draft), interview completed
+    // and no acceptance letter has been generated yet.
+    const applications = await Application.find({
+      step1Completed: true,
+      step2Completed: true,
+      $or: [
+        { acceptanceLetterGeneratedAt: null },
+        { acceptanceLetterGeneratedAt: { $exists: false } },
+      ],
+    })
+      .populate("userId", "name email program cvAnalyzed interviewCompleted isActive")
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const list = applications
+      .filter((app) => app.userId) // skip orphan applications
+      .filter((app) => ["MIRI", "EMFUTECH"].includes(app.userId?.program))
+      .map((app) => ({
+        userId: app.userId?._id,
+        name: app.userId?.name,
+        email: app.userId?.email,
+        program: app.userId?.program,
+        applicationSubmittedAt: app.updatedAt,
+        applicationId: app._id,
+      }));
+    res.json({ pending: list });
+  } catch (error) {
+    console.error("Error listing pending decision letters:", error);
+    res.status(500).json({ message: "Error listing pending decision letters" });
+  }
+});
+
 // List pending invoice (date confirmation) requests
 router.get("/invoice-requests", async (req, res) => {
   try {
@@ -1131,7 +1166,7 @@ router.patch("/users/:userId/invoice-dates", async (req, res) => {
 router.get("/users/:userId/acceptance-letter", async (req, res) => {
   try {
     const { userId } = req.params;
-    const programType = req.query.programType === 'FIJSE' ? 'FIJSE' : 'MIRI';
+    const programType = ['FIJSE', 'EMFUTECH'].includes(req.query.programType) ? req.query.programType : 'MIRI';
 
     const user = await User.findById(userId).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -1193,7 +1228,7 @@ router.get("/users/:userId/invoice", async (req, res) => {
 router.post("/users/:userId/acceptance-letter/notify", async (req, res) => {
   try {
     const { userId } = req.params;
-    const programType = req.body.programType === 'FIJSE' ? 'FIJSE' : 'MIRI';
+    const programType = ['FIJSE', 'EMFUTECH'].includes(req.body.programType) ? req.body.programType : 'MIRI';
 
     const user = await User.findById(userId).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -1254,7 +1289,7 @@ router.post("/acceptance-letter/notify-bulk", async (req, res) => {
     if (!Array.isArray(userIds) || userIds.length === 0) {
       return res.status(400).json({ message: "userIds array is required and must not be empty." });
     }
-    const programType = bodyProgramType === 'FIJSE' ? 'FIJSE' : 'MIRI';
+    const programType = ['FIJSE', 'EMFUTECH'].includes(bodyProgramType) ? bodyProgramType : 'MIRI';
 
     // Use student portal URL for acceptance email so users always land on https://studentportal.mirai-education.tech
     const studentPortalBase = (process.env.STUDENT_PORTAL_URL || process.env.FRONTEND_URL || "https://studentportal.mirai-education.tech").replace(/\/$/, "");
@@ -1349,7 +1384,7 @@ router.post("/acceptance-letter/notify-bulk", async (req, res) => {
 // Body param: programType (optional, default: 'MIRI') - 'MIRI' or 'FIJSE'
 router.post("/acceptance-letter/download-all", async (req, res) => {
   try {
-    const programType = req.body.programType === 'FIJSE' ? 'FIJSE' : 'MIRI';
+    const programType = ['FIJSE', 'EMFUTECH'].includes(req.body.programType) ? req.body.programType : 'MIRI';
     const users = await User.find({}).select("-password").lean();
     if (!users.length) {
       return res.status(400).json({ message: "No users found." });

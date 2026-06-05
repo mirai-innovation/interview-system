@@ -213,6 +213,10 @@ const AdminPanel = () => {
   const [loadingPaymentProofRequests, setLoadingPaymentProofRequests] = useState(false);
   const [paymentProofActionUserId, setPaymentProofActionUserId] = useState(null);
   const [downloadingProofUserId, setDownloadingProofUserId] = useState(null);
+  const [pendingDecisionLetters, setPendingDecisionLetters] = useState([]);
+  const [loadingPendingDecisionLetters, setLoadingPendingDecisionLetters] = useState(false);
+  const [pendingDecisionActionUserId, setPendingDecisionActionUserId] = useState(null);
+  const [pendingDecisionProgramByUserId, setPendingDecisionProgramByUserId] = useState({});
 
   useEffect(() => {
     if (initialLoadExecutedRef.current) {
@@ -223,6 +227,7 @@ const AdminPanel = () => {
     fetchStats();
     fetchInvoiceRequests();
     fetchPaymentProofRequests();
+    fetchPendingDecisionLetters();
   }, []);
 
   useEffect(() => {
@@ -250,6 +255,28 @@ const AdminPanel = () => {
       console.error('Error fetching payment proof requests:', err);
     } finally {
       setLoadingPaymentProofRequests(false);
+    }
+  };
+
+  const fetchPendingDecisionLetters = async () => {
+    try {
+      setLoadingPendingDecisionLetters(true);
+      const response = await api.get('/admin/pending-decision-letters');
+      const pending = response.data?.pending || [];
+      setPendingDecisionLetters(pending);
+      // Initialize per-row default program type from the user's program
+      setPendingDecisionProgramByUserId((prev) => {
+        const next = { ...prev };
+        pending.forEach((row) => {
+          const uid = row.userId?._id || row.userId;
+          if (!next[uid]) next[uid] = row.program || 'MIRI';
+        });
+        return next;
+      });
+    } catch (err) {
+      console.error('Error fetching pending decision letters:', err);
+    } finally {
+      setLoadingPendingDecisionLetters(false);
     }
   };
 
@@ -688,6 +715,142 @@ const AdminPanel = () => {
                 Send email to all active users
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Pending decision letters (MIRI & EMFUTECH) */}
+        <div className="glass-card p-5 sm:p-6 md:p-8 mb-6 sm:mb-8 rounded-2xl border border-gray-200/60">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-1">
+                  Pending decision letters
+                  {pendingDecisionLetters.length > 0 && (
+                    <span className="ml-2 inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full bg-orange-500 text-white text-xs font-bold">
+                      {pendingDecisionLetters.length}
+                    </span>
+                  )}
+                </h2>
+                <p className="text-sm text-gray-500">MIRI and EMFUTECH applicants who finished their interview and are awaiting their decision letter. Generate and send the letter from here.</p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchPendingDecisionLetters}
+                disabled={loadingPendingDecisionLetters}
+                className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Refresh
+              </button>
+            </div>
+            {loadingPendingDecisionLetters ? (
+              <p className="text-sm text-gray-500">Loading pending decisions...</p>
+            ) : pendingDecisionLetters.length === 0 ? (
+              <p className="text-sm text-gray-500">No applicants awaiting a decision letter.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-gray-200">
+                <table className="w-full min-w-[700px] text-left text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold text-gray-700">Name</th>
+                      <th className="px-4 py-3 font-semibold text-gray-700">Email</th>
+                      <th className="px-4 py-3 font-semibold text-gray-700">Program</th>
+                      <th className="px-4 py-3 font-semibold text-gray-700">Submitted</th>
+                      <th className="px-4 py-3 font-semibold text-gray-700">Letter Type</th>
+                      <th className="px-4 py-3 font-semibold text-gray-700">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {pendingDecisionLetters.map((row) => {
+                      const uid = row.userId?._id || row.userId;
+                      const isBusy = pendingDecisionActionUserId === uid;
+                      const selectedProgram = pendingDecisionProgramByUserId[uid] || row.program || 'MIRI';
+                      const formatD = (d) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+                      return (
+                        <tr key={uid} className="bg-white/60 hover:bg-white/80">
+                          <td className="px-4 py-3 text-gray-900">{row.name || '—'}</td>
+                          <td className="px-4 py-3 text-gray-700">{row.email || '—'}</td>
+                          <td className="px-4 py-3 text-gray-700">{row.program || '—'}</td>
+                          <td className="px-4 py-3 text-gray-700">{formatD(row.applicationSubmittedAt)}</td>
+                          <td className="px-4 py-3">
+                            <select
+                              value={selectedProgram}
+                              onChange={(e) => setPendingDecisionProgramByUserId((prev) => ({ ...prev, [uid]: e.target.value }))}
+                              disabled={isBusy}
+                              className="rounded border border-gray-300 px-2 py-1 text-sm bg-white"
+                            >
+                              <option value="MIRI">MIRI</option>
+                              <option value="EMFUTECH">EMFUTECH</option>
+                              <option value="FIJSE">FIJSE</option>
+                            </select>
+                          </td>
+                          <td className="px-4 py-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setPendingDecisionActionUserId(uid);
+                                try {
+                                  const response = await api.get(`/admin/users/${uid}/acceptance-letter?programType=${selectedProgram}`, { responseType: 'blob' });
+                                  const disposition = response.headers['content-disposition'];
+                                  const fileNameMatch = disposition?.match(/filename="?([^"]+)"?/);
+                                  const fileName = fileNameMatch?.[1] || `Decision_Letter_${(row.name || 'User').replace(/\s+/g, '_')}.pdf`;
+                                  const url = window.URL.createObjectURL(new Blob([response.data]));
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.setAttribute('download', fileName);
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  link.remove();
+                                  window.URL.revokeObjectURL(url);
+                                  await fetchPendingDecisionLetters();
+                                } catch (err) {
+                                  if (err.response?.data instanceof Blob) {
+                                    err.response.data.text().then((text) => {
+                                      try {
+                                        const j = JSON.parse(text);
+                                        alert(j.message || 'Error generating PDF.');
+                                      } catch {
+                                        alert('Error generating decision letter PDF.');
+                                      }
+                                    });
+                                  } else {
+                                    alert(err.response?.data?.message || 'Error generating decision letter PDF.');
+                                  }
+                                } finally {
+                                  setPendingDecisionActionUserId(null);
+                                }
+                              }}
+                              disabled={isBusy}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50"
+                            >
+                              {isBusy ? '…' : 'Generate & Download'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setPendingDecisionActionUserId(uid);
+                                try {
+                                  await api.post(`/admin/users/${uid}/acceptance-letter/notify`, { programType: selectedProgram });
+                                  await fetchPendingDecisionLetters();
+                                  alert('Notification sent. The user will receive an email and can download their decision letter from the dashboard.');
+                                } catch (err) {
+                                  alert(err.response?.data?.message || 'Error sending notification.');
+                                } finally {
+                                  setPendingDecisionActionUserId(null);
+                                }
+                              }}
+                              disabled={isBusy}
+                              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium disabled:opacity-50"
+                            >
+                              Notify User
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1758,6 +1921,7 @@ const AdminPanel = () => {
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                           >
                             <option value="MIRI">MIRI (Mirai Innovation Research Immersion Program)</option>
+                            <option value="EMFUTECH">EMFUTECH</option>
                             <option value="FIJSE">Future Innovators Japan Selection Entry</option>
                           </select>
                         </div>

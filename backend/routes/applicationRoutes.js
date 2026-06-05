@@ -325,15 +325,22 @@ router.post("/upload-payment-proof", authMiddleware, paymentProofUpload.single("
 
     const user = await User.findById(req.userId).select("program");
     if (!user) return res.status(404).json({ message: "User not found" });
-    if (user.program !== "MIRI") {
-      return res.status(403).json({ message: "Payment proof upload is only available for MIRI program." });
+    if (!["MIRI", "EMFUTECH"].includes(user.program)) {
+      return res.status(403).json({ message: "Payment proof upload is only available for MIRI and EMFUTECH programs." });
     }
 
     const application = await Application.findOne({ userId: req.userId });
     if (!application) {
       return res.status(403).json({ message: "Application not found." });
     }
-    if (application.invoiceStatus !== "approved") {
+    if (!application.step4Completed) {
+      return res.status(403).json({
+        message: "Please download your decision letter first before uploading a payment proof.",
+      });
+    }
+    // MIRI flow: still require the invoice to be approved (existing date-range flow).
+    // EMFUTECH flow: allow direct upload right after the decision letter has been downloaded.
+    if (user.program === "MIRI" && application.invoiceStatus !== "approved") {
       return res.status(403).json({
         message: "Your invoice must be approved before you can upload a payment proof. Please confirm your dates and wait for approval.",
       });

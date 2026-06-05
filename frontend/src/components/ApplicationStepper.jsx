@@ -1,13 +1,14 @@
 import { Link } from 'react-router-dom';
 import api from '../utils/axios';
 
-const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSuccess }) => {
+const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSuccess, program }) => {
   const step1Completed = applicationStatus?.step1Completed || false;
   const step2Completed = applicationStatus?.step2Completed || false;
   const step3Completed = applicationStatus?.step3Completed || false;
   const step4Completed = applicationStatus?.step4Completed || false;
   const cvAnalyzed = applicationStatus?.cvAnalyzed || false;
   const acceptanceLetterGeneratedAt = applicationStatus?.acceptanceLetterGeneratedAt;
+  const paymentProofStatus = applicationStatus?.paymentProofStatus || null;
 
   // Step 1: Application Form. Step 2: Upload CV. Step 3: AI Interview. Step 4: Acceptance Letter.
   const steps = [
@@ -43,6 +44,14 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
       completed: step4Completed,
       available: !!acceptanceLetterGeneratedAt,
     },
+    ...((program === 'MIRI' || program === 'EMFUTECH') ? [{
+      id: 5,
+      title: 'Register Payment',
+      description: 'Upload your payment receipt (PDF) so an admin can verify it',
+      route: null,
+      completed: paymentProofStatus === 'approved',
+      available: step4Completed,
+    }] : []),
   ];
 
   // Active step = first step not yet completed
@@ -178,7 +187,30 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
 
                     {/* Action Button */}
                     <div className="flex-shrink-0">
-                      {step.id === 4 ? (
+                      {step.id === 5 ? (
+                        // Register Payment - show status badge (the actual upload UI lives in PaymentSection below the stepper)
+                        !isAvailable ? (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+                            Locked
+                          </span>
+                        ) : paymentProofStatus === 'approved' ? (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                            Payment verified
+                          </span>
+                        ) : paymentProofStatus === 'pending' ? (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                            Under review
+                          </span>
+                        ) : paymentProofStatus === 'rejected' ? (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                            Rejected — re-upload
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                            Upload below
+                          </span>
+                        )
+                      ) : step.id === 4 ? (
                         // Acceptance Letter - always show download button if available, allow multiple downloads
                         isAvailable ? (
                           <button
