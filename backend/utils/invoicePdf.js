@@ -8,7 +8,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Program fees (MIRI) — registration not in invoice total, shown in Payment Terms only
-const REGISTRATION_FEE_DISPLAY = 250; // shown in Payment Terms (1st Payment)
+import { REGISTRATION_FEE_USD } from "./registrationFee.js";
+
+const REGISTRATION_FEE_DISPLAY = REGISTRATION_FEE_USD; // shown in Payment Terms (1st Payment)
 const TUITION_PER_WEEK_4_6 = 350;  // USD per week (4 to 6 weeks)
 const TUITION_PER_WEEK_7_PLUS = 300; // USD per week (7+ weeks) — avoids big jump at 13 weeks
 const TAX_RATE = 0.10; // 10%

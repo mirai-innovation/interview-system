@@ -10,8 +10,8 @@ import { streamInvoicePdf } from "../utils/invoicePdf.js";
 import paymentProofUpload from "../middleware/paymentProofUpload.js";
 import { getStripe, isStripeConfigured } from "../utils/stripeClient.js";
 import {
-  REGISTRATION_FEE_CENTS,
-  REGISTRATION_FEE_USD,
+  getRegistrationFeeAmountUsd,
+  getRegistrationFeeCheckoutLineItem,
   isRegistrationFeePaid,
 } from "../utils/registrationFee.js";
 
@@ -27,6 +27,10 @@ router.get("/status", authMiddleware, async (req, res) => {
     const effectiveStep2Completed = !!(application?.step2Completed || user?.interviewCompleted);
     const effectiveCurrentStep = Math.max(application?.currentStep || 1, effectiveStep2Completed ? 3 : 1);
     
+    const registrationFeeAmountUsd = isStripeConfigured()
+      ? await getRegistrationFeeAmountUsd()
+      : null;
+
     if (!application) {
       return res.json({
         exists: false,
@@ -48,6 +52,8 @@ router.get("/status", authMiddleware, async (req, res) => {
         registrationFeeStatus: null,
         registrationFeePaidAt: null,
         registrationFeePaid: false,
+        registrationFeeAmountUsd,
+        stripeConfigured: isStripeConfigured(),
       });
     }
 
@@ -74,7 +80,7 @@ router.get("/status", authMiddleware, async (req, res) => {
       registrationFeeStatus: application.registrationFeeStatus || null,
       registrationFeePaidAt: application.registrationFeePaidAt || null,
       registrationFeePaid: isRegistrationFeePaid(application),
-      registrationFeeAmountUsd: REGISTRATION_FEE_USD,
+      registrationFeeAmountUsd,
       stripeConfigured: isStripeConfigured(),
     });
   } catch (error) {
@@ -300,23 +306,12 @@ router.post("/registration-fee/checkout", authMiddleware, async (req, res) => {
 
     const stripe = getStripe();
     const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
+    const lineItem = await getRegistrationFeeCheckoutLineItem(stripe);
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       customer_email: user.email,
-      line_items: [
-        {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: "MIRI Program Registration Fee",
-              description: "One-time program registration fee (non-refundable)",
-            },
-            unit_amount: REGISTRATION_FEE_CENTS,
-          },
-          quantity: 1,
-        },
-      ],
+      line_items: [lineItem],
       metadata: {
         userId: req.userId.toString(),
         program: "MIRI",

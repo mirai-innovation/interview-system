@@ -14,12 +14,14 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
   const isMIRI = program === 'MIRI';
   const isEMFUTECH = program === 'EMFUTECH';
 
+  const registrationFeeUsd = applicationStatus?.registrationFeeAmountUsd ?? 250;
+
   const miriPostLetterSteps = isMIRI
     ? [
         {
           id: 5,
           title: 'Registration Fee Payment',
-          description: 'Pay the program registration fee (USD 250) via Stripe',
+          description: `Pay the program registration fee (USD ${registrationFeeUsd}) via Stripe`,
           route: null,
           completed: registrationFeePaid,
           available: step4Completed,
