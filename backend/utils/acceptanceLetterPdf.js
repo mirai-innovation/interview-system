@@ -171,28 +171,14 @@ function streamMIRIAcceptanceLetterPdf(res, user, application) {
     })
     .font("Helvetica")
     .text(
-      "for the program. Please use the registration link provided to select your preferred participation dates and duration:",
+      "for the program. To confirm your participation, please log in to your student portal dashboard to pay the registration fee, select your preferred participation dates, and complete the remaining steps.",
       { align: "justify", width: textWidth }
     );
 
   doc.moveDown(0.8);
-  doc.moveDown(0.5);
   doc.font("Helvetica-Bold").text(`Registration Code: ${regCode}`, {
     width: textWidth,
   });
-  doc.font("Helvetica").text("", { continued: false });
-  doc.font("Helvetica").text("", { continued: false });
-  doc
-    .font("Helvetica-Bold")
-    .text("Registration Link:", { continued: true, width: textWidth });
-  doc.font("Helvetica").text(" ", { continued: true });
-  doc
-    .fillColor("blue")
-    .text("https://www.mirai-innovation-lab.com/miri-program-registration-form", {
-      link: "https://www.mirai-innovation-lab.com/miri-program-registration-form",
-      continued: false,
-    })
-    .fillColor("black");
 
   doc.moveDown(0.8);
 
@@ -204,7 +190,7 @@ function streamMIRIAcceptanceLetterPdf(res, user, application) {
     })
     .font("Helvetica-Bold")
     .text("complete your registration within 1 week", { continued: false })
-    .text(" after receiving this acceptance letter.", bodyOptions);
+    .text(" after receiving this decision letter.", bodyOptions);
 
   doc.moveDown(0.8);
 

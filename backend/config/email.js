@@ -717,17 +717,17 @@ If you have any questions, please contact us.
 Best regards,
 Mirai Innovation Research Institute
 Evaluation Committee`
-      : `Mirai Innovation Research Institute - Your Acceptance Letter is Ready
+      : `Mirai Innovation Research Institute - Your Decision Letter is Ready
 
 Hello ${userName || 'Applicant'},
 
-Your official acceptance letter for the ${programName} is now ready.
+Your official decision letter for the ${programName} is now ready.
 
-You can download your acceptance letter PDF from your dashboard:
+You can download your decision letter PDF from your dashboard:
 
 ${finalDashboardUrl || '(Log in to the evaluation system and go to your Dashboard)'}
 
-Log in to your account and you will see the "Acceptance Letter" step with a "Download PDF" button.
+Log in to your account and you will see the "Decision Letter" step with a "Download PDF" button.
 
 If you have any questions, please contact us.
 
@@ -741,7 +741,7 @@ Evaluation Committee`;
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${isFIJSE ? 'You have been accepted to MIRI program' : 'Your Acceptance Letter is Ready'}</title>
+  <title>${isFIJSE ? 'You have been accepted to MIRI program' : 'Your Decision Letter is Ready'}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -766,7 +766,7 @@ Evaluation Committee`;
                 </div>
               </div>
               <h2 style="margin: 0 0 20px 0; color: #1e293b; font-size: 22px; font-weight: 600; text-align: center;">
-                ${isFIJSE ? 'You have been accepted to MIRI program in Osaka, Japan 2026' : 'Your Acceptance Letter is Ready'}
+                ${isFIJSE ? 'You have been accepted to MIRI program in Osaka, Japan 2026' : 'Your Decision Letter is Ready'}
               </h2>
               <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
                 Hello <strong>${safeUserName}</strong>,
@@ -782,10 +782,10 @@ Evaluation Committee`;
                     Log in to your account and go to your <strong>Dashboard</strong>. You will see the &quot;Acceptance Letter&quot; step with a <strong>Download PDF</strong> button to get your letter with all the details about your acceptance, scholarship, and program information.
                   </p>`
                 : `<p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-                    Your official acceptance letter for the <strong>${safeProgramName}</strong> is now ready.
+                    Your official decision letter for the <strong>${safeProgramName}</strong> is now ready.
                   </p>
                   <p style="margin: 0 0 30px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-                    Log in to your account and go to your <strong>Dashboard</strong>. You will see the &quot;Acceptance Letter&quot; step with a <strong>Download PDF</strong> button to get your letter.
+                    Log in to your account and go to your <strong>Dashboard</strong>. You will see the &quot;Decision Letter&quot; step with a <strong>Download PDF</strong> button to get your letter.
                   </p>`
               }
               <div style="text-align: center; margin-top: 30px;">
@@ -822,7 +822,7 @@ Evaluation Committee`;
 
     const emailSubject = isFIJSE
       ? 'You have been accepted to MIRI program in Osaka, Japan 2026 - Mirai Innovation Research Institute'
-      : 'Your Acceptance Letter is Ready - Mirai Innovation Research Institute';
+      : 'Your Decision Letter is Ready - Mirai Innovation Research Institute';
 
     const mailOptions = {
       from: `"Mirai Innovation Research Institute" <${process.env.EMAIL_USER}>`,

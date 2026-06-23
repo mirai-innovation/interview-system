@@ -5,7 +5,6 @@ import api from '../utils/axios';
 import ApplicationStepper from '../components/ApplicationStepper';
 import ConfirmDatesSection from '../components/ConfirmDatesSection';
 import RegisterPaymentSection from '../components/RegisterPaymentSection';
-import RegistrationFeePaymentSection from '../components/RegistrationFeePaymentSection';
 
 // Circular progress (same style as main / Results)
 const CircularProgress = ({ percentage, size = 120, color = 'blue' }) => {
@@ -189,12 +188,6 @@ const Dashboard = () => {
             </div>
           </div>
           <ApplicationStepper applicationStatus={applicationStatus} onDownloadAcceptanceLetterSuccess={fetchApplicationStatus} program={profile?.program} />
-          {isMIRI && applicationStatus?.step4Completed && (
-            <RegistrationFeePaymentSection
-              applicationStatus={applicationStatus}
-              onSuccess={fetchApplicationStatus}
-            />
-          )}
           {isMIRI && applicationStatus?.registrationFeePaid && (
             <ConfirmDatesSection applicationStatus={applicationStatus} onSuccess={fetchApplicationStatus} />
           )}

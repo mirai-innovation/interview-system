@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../utils/axios';
 
 const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSuccess, program }) => {
+  const [payingFee, setPayingFee] = useState(false);
   const step1Completed = applicationStatus?.step1Completed || false;
   const step2Completed = applicationStatus?.step2Completed || false;
   const step3Completed = applicationStatus?.step3Completed || false;
@@ -15,6 +17,7 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
   const isEMFUTECH = program === 'EMFUTECH';
 
   const registrationFeeUsd = applicationStatus?.registrationFeeAmountUsd ?? 250;
+  const stripeConfigured = applicationStatus?.stripeConfigured !== false;
 
   const miriPostLetterSteps = isMIRI
     ? [
@@ -124,7 +127,22 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
     }
   };
 
-  const renderPostLetterStepBadge = (step) => {
+  const handlePayRegistrationFee = async () => {
+    setPayingFee(true);
+    try {
+      const response = await api.post('/application/registration-fee/checkout');
+      const checkoutUrl = response.data?.url;
+      if (!checkoutUrl) {
+        throw new Error('Checkout URL not received');
+      }
+      window.location.href = checkoutUrl;
+    } catch (error) {
+      alert(error.response?.data?.message || error.message || 'Error starting payment.');
+      setPayingFee(false);
+    }
+  };
+
+  const renderPostLetterStepAction = (step) => {
     if (!step.available) {
       return (
         <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
@@ -141,10 +159,25 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
           </span>
         );
       }
+      if (!stripeConfigured) {
+        return (
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+            Unavailable
+          </span>
+        );
+      }
       return (
-        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
-          Pay below
-        </span>
+        <button
+          type="button"
+          onClick={handlePayRegistrationFee}
+          disabled={payingFee}
+          className="inline-flex items-center justify-center bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-sm rounded-full px-8 py-3 shadow-lg shadow-indigo-500/40 hover:shadow-xl hover:scale-105 hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 disabled:opacity-50"
+        >
+          {payingFee ? 'Redirecting to Stripe...' : `Pay USD ${registrationFeeUsd}`}
+          <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+          </svg>
+        </button>
       );
     }
 
@@ -260,7 +293,7 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
 
                     <div className="flex-shrink-0">
                       {isPostLetterPaymentStep ? (
-                        renderPostLetterStepBadge(step)
+                        renderPostLetterStepAction(step)
                       ) : step.id === 4 ? (
                         isAvailable ? (
                           <button
