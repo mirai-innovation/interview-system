@@ -712,7 +712,7 @@ async function getInvoiceStatsData() {
     "invoiceDateRange.startDate": { $exists: true, $ne: null },
     "invoiceDateRange.endDate": { $exists: true, $ne: null },
   })
-    .populate("userId", "name email program")
+    .populate("userId", "name email program digitalId")
     .sort({ "invoiceDateRange.startDate": 1 })
     .lean();
 
@@ -750,6 +750,7 @@ async function getInvoiceStatsData() {
       userId: user._id,
       userName: user.name,
       userEmail: user.email,
+      digitalId: user.digitalId || null,
       startDate: startDate,
       endDate: endDate,
       paymentDeadline: paymentDeadline.toISOString(),
@@ -801,6 +802,7 @@ router.get("/invoice-stats/export", async (req, res) => {
     const frontendBase = (process.env.FRONTEND_URL || "").replace(/\/$/, "");
     const rows = list.map((row) => ({
       "User Name": row.userName ?? "—",
+      "Student Code": row.digitalId ?? "—",
       "User Email": row.userEmail ?? "—",
       "Start Date": formatDateForExport(row.startDate),
       "End Date": formatDateForExport(row.endDate),

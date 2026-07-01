@@ -310,6 +310,7 @@ export default function AdminInvoiceStats() {
                 <thead>
                   <tr className="bg-gray-50/80 border-b border-gray-200">
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">User</th>
+                    <th className="px-2 sm:px-3 py-3 text-left text-xs font-semibold text-gray-700 whitespace-nowrap w-0">Student Code</th>
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Start</th>
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">End</th>
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Weeks</th>
@@ -326,6 +327,11 @@ export default function AdminInvoiceStats() {
                       <td className="px-4 py-3">
                         <div className="font-medium text-gray-900">{row.userName || '—'}</div>
                         <div className="text-xs text-gray-500">{row.userEmail || '—'}</div>
+                      </td>
+                      <td className="px-2 sm:px-3 py-3 whitespace-nowrap w-0 max-w-[9.5rem]">
+                        <p className="text-gray-700 text-xs font-medium truncate" title={row.digitalId || undefined}>
+                          {row.digitalId || '—'}
+                        </p>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.startDate)}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{formatDate(row.endDate)}</td>
