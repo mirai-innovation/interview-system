@@ -1329,7 +1329,7 @@ const AdminPanel = () => {
                 <tr className="border-b border-white/20">
                   <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Avatar</th>
                   <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Name</th>
-                  <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700">ID</th>
+                  <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700 whitespace-nowrap">Student Code</th>
                   <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700 hidden md:table-cell">Email</th>
                   <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Role</th>
                   <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Status</th>
@@ -1418,8 +1418,10 @@ const AdminPanel = () => {
                       </div>
                       <p className="text-gray-500 text-xs md:hidden">{user.email}</p>
                     </td>
-                    <td className="px-3 sm:px-6 py-3 sm:py-4">
-                      <p className="text-gray-600 text-xs font-mono break-all">{user._id}</p>
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                      <p className="text-gray-700 text-xs sm:text-sm font-medium">
+                        {user.digitalId || '—'}
+                      </p>
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">
                       <p className="text-gray-700 text-xs sm:text-sm">{user.email}</p>
