@@ -1329,7 +1329,7 @@ const AdminPanel = () => {
                 <tr className="border-b border-white/20">
                   <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Avatar</th>
                   <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Name</th>
-                  <th className="px-2 sm:px-3 py-3 sm:py-4 text-left text-xs font-semibold text-gray-700 whitespace-nowrap w-0">Student Code</th>
+                  <th className="px-2 sm:px-3 py-3 sm:py-4 text-left text-xs font-semibold text-gray-700 whitespace-nowrap">Student Code</th>
                   <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700 hidden md:table-cell">Email</th>
                   <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Role</th>
                   <th className="px-3 sm:px-6 py-3 sm:py-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Status</th>
@@ -1418,8 +1418,8 @@ const AdminPanel = () => {
                       </div>
                       <p className="text-gray-500 text-xs md:hidden">{user.email}</p>
                     </td>
-                    <td className="px-2 sm:px-3 py-3 sm:py-4 whitespace-nowrap w-0 max-w-[9.5rem]">
-                      <p className="text-gray-700 text-xs font-medium truncate" title={user.studentCode || undefined}>
+                    <td className="px-2 sm:px-3 py-3 sm:py-4 whitespace-nowrap min-w-[13rem]">
+                      <p className="text-gray-700 text-xs font-medium">
                         {user.studentCode || '—'}
                       </p>
                     </td>

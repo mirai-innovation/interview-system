@@ -310,7 +310,7 @@ export default function AdminInvoiceStats() {
                 <thead>
                   <tr className="bg-gray-50/80 border-b border-gray-200">
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">User</th>
-                    <th className="px-2 sm:px-3 py-3 text-left text-xs font-semibold text-gray-700 whitespace-nowrap w-0">Student Code</th>
+                    <th className="px-2 sm:px-3 py-3 text-left text-xs font-semibold text-gray-700 whitespace-nowrap">Student Code</th>
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Start</th>
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">End</th>
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Weeks</th>
@@ -328,8 +328,8 @@ export default function AdminInvoiceStats() {
                         <div className="font-medium text-gray-900">{row.userName || '—'}</div>
                         <div className="text-xs text-gray-500">{row.userEmail || '—'}</div>
                       </td>
-                      <td className="px-2 sm:px-3 py-3 whitespace-nowrap w-0 max-w-[9.5rem]">
-                        <p className="text-gray-700 text-xs font-medium truncate" title={row.studentCode || undefined}>
+                      <td className="px-2 sm:px-3 py-3 whitespace-nowrap min-w-[13rem]">
+                        <p className="text-gray-700 text-xs font-medium">
                           {row.studentCode || '—'}
                         </p>
                       </td>
