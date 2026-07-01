@@ -1,11 +1,7 @@
 /**
- * MIRI registration / student code (e.g. MIRI-2026-01-049, MIRI-2026-8).
+ * Assigned student / registration code for a user.
+ * Uses registrationCode, promotionalCode, or digitalId — whichever is set.
  */
-export function isMiriStudentCode(value) {
-  if (!value || typeof value !== "string") return false;
-  return /^MIRI-2026/i.test(value.trim());
-}
-
 export function resolveStudentCode(user, application = null) {
   if (!user) return null;
 
@@ -17,9 +13,5 @@ export function resolveStudentCode(user, application = null) {
     .map((value) => value?.trim())
     .filter(Boolean);
 
-  for (const code of candidates) {
-    if (isMiriStudentCode(code)) return code;
-  }
-
-  return null;
+  return candidates[0] || null;
 }
