@@ -131,7 +131,7 @@ export default function AdminInvoiceStats() {
         <div className="ambient-orb-2" />
         <div className="ambient-orb-3" />
         <Navbar />
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="container mx-auto px-4 py-8 max-w-7xl xl:max-w-[1500px] 2xl:max-w-[1800px]">
           <div className="flex flex-col items-center justify-center py-24">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4" />
             <p className="text-gray-600">Loading invoice statistics...</p>
@@ -169,7 +169,7 @@ export default function AdminInvoiceStats() {
       <div className="ambient-orb-2" />
       <div className="ambient-orb-3" />
       <Navbar />
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="container mx-auto px-4 py-8 max-w-7xl xl:max-w-[1500px] 2xl:max-w-[1800px]">
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Invoice Statistics (MIRI)</h1>

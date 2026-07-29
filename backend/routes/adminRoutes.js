@@ -1087,6 +1087,75 @@ router.patch("/users/:userId/payment-proof-reject", async (req, res) => {
   }
 });
 
+// ----- Manual payment corrections (admin) -----
+// Registration fee (Stripe): set paid/unpaid by hand. Needed for users who paid
+// before Stripe checkout existed, paid outside the platform, or were recorded wrong.
+router.patch("/users/:userId/registration-fee", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { status } = req.body;
+    if (!["paid", "unpaid"].includes(status)) {
+      return res.status(400).json({ message: "Status must be 'paid' or 'unpaid'." });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    let application = await Application.findOne({ userId });
+    if (!application) {
+      application = new Application({ userId, email: user.email });
+    }
+
+    if (status === "paid") {
+      application.registrationFeeStatus = "paid";
+      application.registrationFeePaidAt = application.registrationFeePaidAt || new Date();
+    } else {
+      // Keep "pending" when a Stripe checkout was started, so the Stripe trail stays readable.
+      application.registrationFeeStatus = application.stripeCheckoutSessionId ? "pending" : null;
+      application.registrationFeePaidAt = null;
+    }
+    await application.save();
+
+    res.json({
+      message:
+        status === "paid"
+          ? "Registration fee marked as paid."
+          : "Registration fee marked as unpaid.",
+      registrationFeeStatus: application.registrationFeeStatus,
+      registrationFeePaidAt: application.registrationFeePaidAt,
+    });
+  } catch (error) {
+    console.error("Error updating registration fee status:", error);
+    res.status(500).json({ message: "Error updating registration fee status" });
+  }
+});
+
+// Program payment: mark as paid by hand, with or without an uploaded proof
+// (payment received outside the platform, or proof approved elsewhere).
+router.patch("/users/:userId/payment-proof-paid", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    let application = await Application.findOne({ userId });
+    if (!application) {
+      application = new Application({ userId, email: user.email });
+    }
+    application.paymentProofStatus = "approved";
+    application.paymentProofApprovedAt = application.paymentProofApprovedAt || new Date();
+    await application.save();
+
+    res.json({
+      message: "Program payment marked as paid.",
+      paymentProofStatus: application.paymentProofStatus,
+    });
+  } catch (error) {
+    console.error("Error marking program payment as paid:", error);
+    res.status(500).json({ message: "Error marking program payment as paid" });
+  }
+});
+
 // Mark payment as unpaid (revert an already-approved payment proof back to pending review)
 router.patch("/users/:userId/payment-proof-unpaid", async (req, res) => {
   try {

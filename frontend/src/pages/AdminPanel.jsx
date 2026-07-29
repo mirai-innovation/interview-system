@@ -218,7 +218,7 @@ const AdminPanel = () => {
   const [loadingPaymentProofRequests, setLoadingPaymentProofRequests] = useState(false);
   const [paymentProofActionUserId, setPaymentProofActionUserId] = useState(null);
   const [downloadingProofUserId, setDownloadingProofUserId] = useState(null);
-  const [markingUnpaid, setMarkingUnpaid] = useState(false);
+  const [savingPaymentFix, setSavingPaymentFix] = useState(false);
   const [pendingDecisionLetters, setPendingDecisionLetters] = useState([]);
   const [loadingPendingDecisionLetters, setLoadingPendingDecisionLetters] = useState(false);
   const [pendingDecisionActionUserId, setPendingDecisionActionUserId] = useState(null);
@@ -468,6 +468,24 @@ const AdminPanel = () => {
       }
     } finally {
       setDownloadingProofUserId(null);
+    }
+  };
+
+  // Manual payment corrections: registration fee (Stripe) and program payment (proof).
+  // `endpoint` is one of: registration-fee | payment-proof-paid | payment-proof-unpaid
+  const applyPaymentFix = async (endpoint, { body, confirmMessage, successMessage }) => {
+    if (confirmMessage && !confirm(confirmMessage)) return;
+    setSavingPaymentFix(true);
+    try {
+      await api.patch(`/admin/users/${selectedUser}/${endpoint}`, body);
+      await fetchUserDetails(selectedUser);
+      await fetchUsers();
+      await fetchPaymentProofRequests();
+      alert(successMessage);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error updating payment status.');
+    } finally {
+      setSavingPaymentFix(false);
     }
   };
 
@@ -2445,6 +2463,41 @@ const AdminPanel = () => {
                             Stripe reference: {userDetails.application.stripePaymentIntentId || userDetails.application.stripeCheckoutSessionId}
                           </p>
                         )}
+                        <div className="mt-4 pt-4 border-t border-gray-200/60">
+                          <p className="text-sm text-gray-600 mb-3">
+                            Manual correction: use this when the fee was paid outside Stripe (e.g. before the Stripe
+                            checkout existed) or the status was recorded on the wrong payment.
+                          </p>
+                          <div className="flex flex-wrap gap-3">
+                            {userDetails.application?.registrationFeeStatus !== 'paid' ? (
+                              <button
+                                type="button"
+                                onClick={() => applyPaymentFix('registration-fee', {
+                                  body: { status: 'paid' },
+                                  confirmMessage: 'Mark the registration fee as paid for this user?',
+                                  successMessage: 'Registration fee marked as paid.',
+                                })}
+                                disabled={savingPaymentFix}
+                                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                              >
+                                {savingPaymentFix ? 'Saving…' : 'Mark registration fee as paid'}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => applyPaymentFix('registration-fee', {
+                                  body: { status: 'unpaid' },
+                                  confirmMessage: 'Mark the registration fee as unpaid for this user?',
+                                  successMessage: 'Registration fee marked as unpaid.',
+                                })}
+                                disabled={savingPaymentFix}
+                                className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                              >
+                                {savingPaymentFix ? 'Saving…' : 'Mark registration fee as unpaid'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
                       <div className="glass-card p-6">
@@ -2822,7 +2875,7 @@ const AdminPanel = () => {
                                     <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                     </svg>
-                                    Payment Proof
+                                    Program Payment (payment proof)
                                   </h4>
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                     <DataCard
@@ -2851,8 +2904,11 @@ const AdminPanel = () => {
                                       />
                                     )}
                                   </div>
-                                  {hasProof ? (
-                                    <div className="flex flex-wrap gap-3">
+                                  {!hasProof && (
+                                    <p className="text-sm text-gray-600 mb-3">This user has not uploaded a payment proof yet.</p>
+                                  )}
+                                  <div className="flex flex-wrap gap-3">
+                                    {hasProof && (
                                       <button
                                         type="button"
                                         onClick={() => downloadPaymentProof(selectedUser, userDetails.name)}
@@ -2864,33 +2920,37 @@ const AdminPanel = () => {
                                         </svg>
                                         {downloadingProofUserId === selectedUser ? 'Downloading…' : 'Download Payment Proof'}
                                       </button>
-                                      {isPaid && (
-                                        <button
-                                          type="button"
-                                          onClick={async () => {
-                                            if (!confirm('Mark this invoice as unpaid? The payment proof will go back to pending review.')) return;
-                                            setMarkingUnpaid(true);
-                                            try {
-                                              await api.patch(`/admin/users/${selectedUser}/payment-proof-unpaid`);
-                                              await fetchUserDetails(selectedUser);
-                                              await fetchPaymentProofRequests();
-                                              alert('Invoice marked as unpaid.');
-                                            } catch (err) {
-                                              alert(err.response?.data?.message || 'Error marking as unpaid.');
-                                            } finally {
-                                              setMarkingUnpaid(false);
-                                            }
-                                          }}
-                                          disabled={markingUnpaid}
-                                          className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
-                                        >
-                                          {markingUnpaid ? 'Saving…' : 'Mark as unpaid'}
-                                        </button>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <p className="text-sm text-gray-600">This user has not uploaded a payment proof yet.</p>
-                                  )}
+                                    )}
+                                    {isPaid ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => applyPaymentFix('payment-proof-unpaid', {
+                                          confirmMessage: hasProof
+                                            ? 'Mark the program payment as unpaid? The payment proof will go back to pending review.'
+                                            : 'Mark the program payment as unpaid?',
+                                          successMessage: 'Program payment marked as unpaid.',
+                                        })}
+                                        disabled={savingPaymentFix}
+                                        className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+                                      >
+                                        {savingPaymentFix ? 'Saving…' : 'Mark as unpaid'}
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => applyPaymentFix('payment-proof-paid', {
+                                          confirmMessage: hasProof
+                                            ? 'Mark the program payment as paid (approve this proof)?'
+                                            : 'Mark the program payment as paid? No proof was uploaded for this user.',
+                                          successMessage: 'Program payment marked as paid.',
+                                        })}
+                                        disabled={savingPaymentFix}
+                                        className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+                                      >
+                                        {savingPaymentFix ? 'Saving…' : 'Mark as paid'}
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               );
                             })()}
