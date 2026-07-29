@@ -72,7 +72,10 @@ router.get("/users", async (req, res) => {
     // Add acceptance letter information: single query instead of N+1
     const userIds = users.map((u) => u._id);
     const applications = await Application.find({ userId: { $in: userIds } })
-      .select("userId acceptanceLetterGeneratedAt acceptanceLetterProgramType promotionalCode registrationCode")
+      .select(
+        "userId acceptanceLetterGeneratedAt acceptanceLetterProgramType promotionalCode registrationCode " +
+          "registrationFeeStatus registrationFeePaidAt paymentProofStatus paymentProofUploadedAt"
+      )
       .lean();
     const appByUserId = new Map(applications.map((a) => [a.userId.toString(), a]));
     const usersWithAcceptanceLetter = users.map((user) => {
@@ -83,6 +86,11 @@ router.get("/users", async (req, res) => {
         studentCode: resolveStudentCode(userObj, app),
         acceptanceLetterGeneratedAt: app?.acceptanceLetterGeneratedAt ?? null,
         acceptanceLetterProgramType: app?.acceptanceLetterProgramType ?? null,
+        // Registration fee (Stripe) vs program payment (uploaded proof) — shown as separate indicators
+        registrationFeeStatus: app?.registrationFeeStatus ?? null,
+        registrationFeePaidAt: app?.registrationFeePaidAt ?? null,
+        paymentProofStatus: app?.paymentProofStatus ?? null,
+        paymentProofUploadedAt: app?.paymentProofUploadedAt ?? null,
       };
     });
 
