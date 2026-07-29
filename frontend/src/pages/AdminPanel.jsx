@@ -218,6 +218,7 @@ const AdminPanel = () => {
   const [loadingPaymentProofRequests, setLoadingPaymentProofRequests] = useState(false);
   const [paymentProofActionUserId, setPaymentProofActionUserId] = useState(null);
   const [downloadingProofUserId, setDownloadingProofUserId] = useState(null);
+  const [markingUnpaid, setMarkingUnpaid] = useState(false);
   const [pendingDecisionLetters, setPendingDecisionLetters] = useState([]);
   const [loadingPendingDecisionLetters, setLoadingPendingDecisionLetters] = useState(false);
   const [pendingDecisionActionUserId, setPendingDecisionActionUserId] = useState(null);
@@ -435,6 +436,38 @@ const AdminPanel = () => {
       alert('Error fetching user details');
     } finally {
       setLoadingDetails(false);
+    }
+  };
+
+  // Download a user's uploaded payment proof PDF (comprobante de pago)
+  const downloadPaymentProof = async (userId, userName) => {
+    setDownloadingProofUserId(userId);
+    try {
+      const response = await api.get(`/admin/users/${userId}/payment-proof`, { responseType: 'blob' });
+      const disposition = response.headers['content-disposition'];
+      const fileNameMatch = disposition?.match(/filename="?([^"]+)"?/);
+      const fileName = fileNameMatch?.[1] || `Payment_Proof_${(userName || 'User').replace(/\s+/g, '_')}.pdf`;
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      if (err.response?.data instanceof Blob) {
+        const text = await err.response.data.text();
+        try {
+          alert(JSON.parse(text).message || 'Error downloading payment proof.');
+        } catch {
+          alert('Error downloading payment proof.');
+        }
+      } else {
+        alert(err.response?.data?.message || 'Error downloading payment proof.');
+      }
+    } finally {
+      setDownloadingProofUserId(null);
     }
   };
 
@@ -2693,6 +2726,90 @@ const AdminPanel = () => {
                                       </div>
                                     )}
                                   </div>
+                                </div>
+                              );
+                            })()}
+
+                            {/* Payment proof (comprobante de pago) */}
+                            {(() => {
+                              const proofStatus = userDetails.application.paymentProofStatus;
+                              const hasProof = !!userDetails.application.paymentProofUrl;
+                              const isPaid = proofStatus === 'approved';
+                              return (
+                                <div className="glass-card p-6 bg-purple-50/30 border-purple-200/40">
+                                  <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    Payment Proof
+                                  </h4>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <DataCard
+                                      label="Payment Status"
+                                      value={
+                                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                          isPaid
+                                            ? 'bg-green-100 text-green-700'
+                                            : proofStatus === 'pending'
+                                            ? 'bg-yellow-100 text-yellow-700'
+                                            : proofStatus === 'rejected'
+                                            ? 'bg-red-100 text-red-700'
+                                            : 'bg-gray-100 text-gray-700'
+                                        }`}>
+                                          {isPaid ? '✓ Paid' :
+                                           proofStatus === 'pending' ? '⏳ Pending review' :
+                                           proofStatus === 'rejected' ? '✗ Rejected' :
+                                           '— Not uploaded'}
+                                        </span>
+                                      }
+                                    />
+                                    {userDetails.application.paymentProofUploadedAt && (
+                                      <DataCard
+                                        label="Uploaded At"
+                                        value={formatDate(userDetails.application.paymentProofUploadedAt)}
+                                      />
+                                    )}
+                                  </div>
+                                  {hasProof ? (
+                                    <div className="flex flex-wrap gap-3">
+                                      <button
+                                        type="button"
+                                        onClick={() => downloadPaymentProof(selectedUser, userDetails.name)}
+                                        disabled={downloadingProofUserId === selectedUser}
+                                        className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+                                      >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        {downloadingProofUserId === selectedUser ? 'Downloading…' : 'Download Payment Proof'}
+                                      </button>
+                                      {isPaid && (
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            if (!confirm('Mark this invoice as unpaid? The payment proof will go back to pending review.')) return;
+                                            setMarkingUnpaid(true);
+                                            try {
+                                              await api.patch(`/admin/users/${selectedUser}/payment-proof-unpaid`);
+                                              await fetchUserDetails(selectedUser);
+                                              await fetchPaymentProofRequests();
+                                              alert('Invoice marked as unpaid.');
+                                            } catch (err) {
+                                              alert(err.response?.data?.message || 'Error marking as unpaid.');
+                                            } finally {
+                                              setMarkingUnpaid(false);
+                                            }
+                                          }}
+                                          disabled={markingUnpaid}
+                                          className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50"
+                                        >
+                                          {markingUnpaid ? 'Saving…' : 'Mark as unpaid'}
+                                        </button>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-gray-600">This user has not uploaded a payment proof yet.</p>
+                                  )}
                                 </div>
                               );
                             })()}

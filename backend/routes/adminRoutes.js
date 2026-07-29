@@ -762,6 +762,8 @@ async function getInvoiceStatsData() {
       total,
       invoiceStatus: app.invoiceStatus || "pending",
       paymentProofStatus: app.paymentProofStatus || null,
+      hasPaymentProof: !!app.paymentProofUrl,
+      paymentProofUploadedAt: app.paymentProofUploadedAt || null,
       isPaid: app.paymentProofStatus === "approved",
     });
   }
@@ -1074,6 +1076,30 @@ router.patch("/users/:userId/payment-proof-reject", async (req, res) => {
   } catch (error) {
     console.error("Error rejecting payment proof:", error);
     res.status(500).json({ message: "Error rejecting payment proof" });
+  }
+});
+
+// Mark payment as unpaid (revert an already-approved payment proof back to pending review)
+router.patch("/users/:userId/payment-proof-unpaid", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const application = await Application.findOne({ userId });
+    if (!application) {
+      return res.status(404).json({ message: "No application found for this user." });
+    }
+    // Keep the uploaded file: if there is one, it goes back to the pending review queue.
+    application.paymentProofStatus = application.paymentProofUrl ? "pending" : null;
+    application.paymentProofApprovedAt = null;
+    await application.save();
+    res.json({
+      message: application.paymentProofUrl
+        ? "Invoice marked as unpaid. The payment proof is pending review again."
+        : "Invoice marked as unpaid.",
+      paymentProofStatus: application.paymentProofStatus,
+    });
+  } catch (error) {
+    console.error("Error marking payment as unpaid:", error);
+    res.status(500).json({ message: "Error marking payment as unpaid" });
   }
 });
 

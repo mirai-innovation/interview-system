@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../utils/axios';
@@ -31,15 +31,30 @@ export default function AdminInvoiceStats() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [downloadingUserId, setDownloadingUserId] = useState(null);
+  const [downloadingProofUserId, setDownloadingProofUserId] = useState(null);
+  const [markingUnpaidUserId, setMarkingUnpaidUserId] = useState(null);
   const [exportingExcel, setExportingExcel] = useState(false);
 
-  const handleDownloadExcel = async () => {
-    setExportingExcel(true);
+  const fetchStats = useCallback(async ({ silent = false } = {}) => {
     try {
-      const response = await api.get('/admin/invoice-stats/export', { responseType: 'blob' });
+      if (!silent) setLoading(true);
+      setError(null);
+      const res = await api.get('/admin/invoice-stats');
+      setData({ list: res.data.list || [], summary: res.data.summary || null });
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error loading invoice statistics');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
+
+  // Download a blob response as a file, surfacing JSON error bodies returned as blobs
+  const downloadBlob = async (request, fallbackFileName, errorMessage) => {
+    try {
+      const response = await request();
       const disposition = response.headers['content-disposition'];
       const fileNameMatch = disposition?.match(/filename="?([^"]+)"?/);
-      const fileName = fileNameMatch?.[1] || `MIRI_Invoices_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const fileName = fileNameMatch?.[1] || fallbackFileName;
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -50,71 +65,64 @@ export default function AdminInvoiceStats() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       if (err.response?.data instanceof Blob) {
-        err.response.data.text().then((text) => {
-          try {
-            const jsonError = JSON.parse(text);
-            alert(jsonError.message || 'Error downloading Excel.');
-          } catch {
-            alert('Error downloading Excel.');
-          }
-        });
+        const text = await err.response.data.text();
+        try {
+          alert(JSON.parse(text).message || errorMessage);
+        } catch {
+          alert(errorMessage);
+        }
       } else {
-        alert(err.response?.data?.message || 'Error downloading Excel.');
+        alert(err.response?.data?.message || errorMessage);
       }
-    } finally {
-      setExportingExcel(false);
     }
+  };
+
+  const handleDownloadPaymentProof = async (userId, userName) => {
+    setDownloadingProofUserId(userId);
+    await downloadBlob(
+      () => api.get(`/admin/users/${userId}/payment-proof`, { responseType: 'blob' }),
+      `Payment_Proof_${(userName || 'User').replace(/\s+/g, '_')}.pdf`,
+      'Error downloading payment proof.'
+    );
+    setDownloadingProofUserId(null);
+  };
+
+  const handleMarkUnpaid = async (userId) => {
+    if (!confirm('Mark this invoice as unpaid? The payment proof will go back to pending review.')) return;
+    setMarkingUnpaidUserId(userId);
+    try {
+      await api.patch(`/admin/users/${userId}/payment-proof-unpaid`);
+      await fetchStats({ silent: true });
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error marking as unpaid.');
+    } finally {
+      setMarkingUnpaidUserId(null);
+    }
+  };
+
+  const handleDownloadExcel = async () => {
+    setExportingExcel(true);
+    await downloadBlob(
+      () => api.get('/admin/invoice-stats/export', { responseType: 'blob' }),
+      `MIRI_Invoices_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      'Error downloading Excel.'
+    );
+    setExportingExcel(false);
   };
 
   const handleDownloadInvoice = async (userId, userName) => {
     setDownloadingUserId(userId);
-    try {
-      const response = await api.get(`/admin/users/${userId}/invoice`, { responseType: 'blob' });
-      const disposition = response.headers['content-disposition'];
-      const fileNameMatch = disposition?.match(/filename="?([^"]+)"?/);
-      const fullName = (userName || 'Invoice').replace(/\s+/g, '_');
-      const fileName = fileNameMatch?.[1] || `MIRI_Invoice_${fullName}.pdf`;
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      if (err.response?.data instanceof Blob) {
-        err.response.data.text().then((text) => {
-          try {
-            const jsonError = JSON.parse(text);
-            alert(jsonError.message || 'Error downloading invoice.');
-          } catch {
-            alert('Error downloading invoice.');
-          }
-        });
-      } else {
-        alert(err.response?.data?.message || 'Error downloading invoice.');
-      }
-    } finally {
-      setDownloadingUserId(null);
-    }
+    await downloadBlob(
+      () => api.get(`/admin/users/${userId}/invoice`, { responseType: 'blob' }),
+      `MIRI_Invoice_${(userName || 'Invoice').replace(/\s+/g, '_')}.pdf`,
+      'Error downloading invoice.'
+    );
+    setDownloadingUserId(null);
   };
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await api.get('/admin/invoice-stats');
-        setData({ list: res.data.list || [], summary: res.data.summary || null });
-      } catch (err) {
-        setError(err.response?.data?.message || 'Error loading invoice statistics');
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchStats();
-  }, []);
+  }, [fetchStats]);
 
   if (loading) {
     return (
@@ -319,6 +327,7 @@ export default function AdminInvoiceStats() {
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Total (USD)</th>
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Paid</th>
                     <th className="px-4 py-3 text-sm font-semibold text-gray-700">Invoice</th>
+                    <th className="px-4 py-3 text-sm font-semibold text-gray-700">Payment proof</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -345,11 +354,24 @@ export default function AdminInvoiceStats() {
                       </td>
                       <td className="px-4 py-3">
                         {row.isPaid ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800" title="Pagado">
-                            ✓ Paid
-                          </span>
+                          <div className="flex flex-col items-start gap-1">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800" title="Pagado">
+                              ✓ Paid
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleMarkUnpaid(row.userId)}
+                              disabled={markingUnpaidUserId === row.userId}
+                              className="text-xs font-medium text-amber-700 hover:text-amber-800 underline disabled:opacity-50"
+                              title="Revert to unpaid (the payment proof goes back to pending review)"
+                            >
+                              {markingUnpaidUserId === row.userId ? '…' : 'Mark unpaid'}
+                            </button>
+                          </div>
                         ) : (
-                          <span className="text-gray-400 text-sm">—</span>
+                          <span className="text-gray-400 text-sm">
+                            {row.paymentProofStatus === 'pending' ? 'Pending review' : '—'}
+                          </span>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -364,6 +386,23 @@ export default function AdminInvoiceStats() {
                           </svg>
                           {downloadingUserId === row.userId ? '…' : 'PDF'}
                         </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        {row.hasPaymentProof ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadPaymentProof(row.userId, row.userName)}
+                            disabled={downloadingProofUserId === row.userId}
+                            className="inline-flex items-center gap-1.5 text-purple-600 hover:text-purple-700 font-medium text-sm disabled:opacity-50"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            {downloadingProofUserId === row.userId ? '…' : 'Proof'}
+                          </button>
+                        ) : (
+                          <span className="text-gray-400 text-sm">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}
