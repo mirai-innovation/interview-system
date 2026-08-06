@@ -52,18 +52,25 @@ router.get("/users", async (req, res) => {
     const total = await User.countDocuments(query);
     console.log(`Total de usuarios encontrados: ${total}`);
 
+    // Only the fields the admin table renders. The full record (CV text, interview
+    // answers, transcriptions, survey results, report threads) is many times larger
+    // and is already fetched per user by GET /admin/users/:userId when a row is opened.
+    // `reports.resolved` is enough for the unresolved-reports badge.
+    const LIST_FIELDS =
+      "name email profilePhoto role isActive program digitalId score interviewScore reports.resolved createdAt";
+
     // Si no se especifica límite, devolver todos los usuarios
     let users;
     if (limit) {
       users = await User.find(query)
-        .select("-password")
+        .select(LIST_FIELDS)
         .limit(limit * 1)
         .skip((page - 1) * limit)
         .sort({ createdAt: -1 });
     } else {
       // Sin límite, devolver todos
       users = await User.find(query)
-        .select("-password")
+        .select(LIST_FIELDS)
         .sort({ createdAt: -1 });
     }
 
@@ -723,6 +730,10 @@ async function getInvoiceStatsData() {
     "invoiceDateRange.startDate": { $exists: true, $ne: null },
     "invoiceDateRange.endDate": { $exists: true, $ne: null },
   })
+    .select(
+      "userId invoiceDateRange invoiceStatus scholarshipPercentage paymentProofUrl " +
+        "paymentProofStatus paymentProofUploadedAt promotionalCode registrationCode"
+    )
     .populate("userId", "name email program digitalId")
     .sort({ "invoiceDateRange.startDate": 1 })
     .lean();
@@ -972,6 +983,7 @@ router.get("/pending-decision-letters", async (req, res) => {
         { acceptanceLetterGeneratedAt: { $exists: false } },
       ],
     })
+      .select("userId updatedAt")
       .populate("userId", "name email program cvAnalyzed interviewCompleted isActive")
       .sort({ updatedAt: -1 })
       .lean();
@@ -1002,6 +1014,7 @@ router.get("/invoice-requests", async (req, res) => {
       "invoiceDateRange.startDate": { $exists: true },
       "invoiceDateRange.endDate": { $exists: true },
     })
+      .select("userId invoiceDateRange")
       .populate("userId", "name email program")
       .sort({ updatedAt: -1 });
     const list = applications.map((app) => ({
@@ -1125,6 +1138,7 @@ router.get("/payment-proof-requests", async (req, res) => {
       paymentProofStatus: "pending",
       paymentProofUrl: { $exists: true, $ne: "" },
     })
+      .select("userId paymentProofUploadedAt")
       .populate("userId", "name email program")
       .sort({ paymentProofUploadedAt: -1 })
       .lean();
