@@ -26,13 +26,21 @@ const formatMonth = (yyyyMm) => {
   return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 };
 
+// Programs without the MIRI invoice flow: students upload a payment proof right
+// after their decision letter, so there is no date range and no invoice amount.
+const PROGRAM_PAYMENT_VIEW = 'EMFUTECH';
+
 export default function AdminInvoiceStats() {
+  const [view, setView] = useState('MIRI'); // 'MIRI' (invoices) | 'EMFUTECH' (payments)
   const [data, setData] = useState({ list: [], summary: null });
+  const [programData, setProgramData] = useState({ list: [], summary: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [downloadingUserId, setDownloadingUserId] = useState(null);
   const [downloadingProofUserId, setDownloadingProofUserId] = useState(null);
   const [markingUnpaidUserId, setMarkingUnpaidUserId] = useState(null);
+  const [markingPaidUserId, setMarkingPaidUserId] = useState(null);
+  const [onlyWithLetter, setOnlyWithLetter] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
 
   const fetchStats = useCallback(async ({ silent = false } = {}) => {
@@ -47,6 +55,24 @@ export default function AdminInvoiceStats() {
       if (!silent) setLoading(false);
     }
   }, []);
+
+  const fetchProgramPayments = useCallback(async ({ silent = false } = {}) => {
+    try {
+      if (!silent) setLoading(true);
+      setError(null);
+      const res = await api.get('/admin/program-payments', { params: { program: PROGRAM_PAYMENT_VIEW } });
+      setProgramData({ list: res.data.list || [], summary: res.data.summary || null });
+    } catch (err) {
+      setError(err.response?.data?.message || `Error loading ${PROGRAM_PAYMENT_VIEW} payments`);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
+
+  const refreshCurrentView = useCallback(
+    () => (view === 'MIRI' ? fetchStats({ silent: true }) : fetchProgramPayments({ silent: true })),
+    [view, fetchStats, fetchProgramPayments]
+  );
 
   // Download a blob response as a file, surfacing JSON error bodies returned as blobs
   const downloadBlob = async (request, fallbackFileName, errorMessage) => {
@@ -88,11 +114,11 @@ export default function AdminInvoiceStats() {
   };
 
   const handleMarkUnpaid = async (userId) => {
-    if (!confirm('Mark this invoice as unpaid? The payment proof will go back to pending review.')) return;
+    if (!confirm('Mark this payment as unpaid? The payment proof will go back to pending review.')) return;
     setMarkingUnpaidUserId(userId);
     try {
       await api.patch(`/admin/users/${userId}/payment-proof-unpaid`);
-      await fetchStats({ silent: true });
+      await refreshCurrentView();
     } catch (err) {
       alert(err.response?.data?.message || 'Error marking as unpaid.');
     } finally {
@@ -100,13 +126,39 @@ export default function AdminInvoiceStats() {
     }
   };
 
+  const handleMarkPaid = async (userId, hasProof) => {
+    if (!confirm(hasProof
+      ? 'Mark this payment as paid (approve this proof)?'
+      : 'Mark this payment as paid? No proof was uploaded for this student.')) return;
+    setMarkingPaidUserId(userId);
+    try {
+      await api.patch(`/admin/users/${userId}/payment-proof-paid`);
+      await refreshCurrentView();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error marking as paid.');
+    } finally {
+      setMarkingPaidUserId(null);
+    }
+  };
+
   const handleDownloadExcel = async () => {
     setExportingExcel(true);
-    await downloadBlob(
-      () => api.get('/admin/invoice-stats/export', { responseType: 'blob' }),
-      `MIRI_Invoices_${new Date().toISOString().slice(0, 10)}.xlsx`,
-      'Error downloading Excel.'
-    );
+    if (view === 'MIRI') {
+      await downloadBlob(
+        () => api.get('/admin/invoice-stats/export', { responseType: 'blob' }),
+        `MIRI_Invoices_${new Date().toISOString().slice(0, 10)}.xlsx`,
+        'Error downloading Excel.'
+      );
+    } else {
+      await downloadBlob(
+        () => api.get('/admin/program-payments/export', {
+          params: { program: PROGRAM_PAYMENT_VIEW },
+          responseType: 'blob',
+        }),
+        `${PROGRAM_PAYMENT_VIEW}_Payments_${new Date().toISOString().slice(0, 10)}.xlsx`,
+        'Error downloading Excel.'
+      );
+    }
     setExportingExcel(false);
   };
 
@@ -121,8 +173,9 @@ export default function AdminInvoiceStats() {
   };
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    if (view === 'MIRI') fetchStats();
+    else fetchProgramPayments();
+  }, [view, fetchStats, fetchProgramPayments]);
 
   if (loading) {
     return (
@@ -134,7 +187,9 @@ export default function AdminInvoiceStats() {
         <div className="container mx-auto px-4 py-8 max-w-7xl xl:max-w-[1500px] 2xl:max-w-[1800px]">
           <div className="flex flex-col items-center justify-center py-24">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4" />
-            <p className="text-gray-600">Loading invoice statistics...</p>
+            <p className="text-gray-600">
+              {view === 'MIRI' ? 'Loading invoice statistics...' : `Loading ${PROGRAM_PAYMENT_VIEW} payments...`}
+            </p>
           </div>
         </div>
       </div>
@@ -163,6 +218,38 @@ export default function AdminInvoiceStats() {
     students: count,
   }));
 
+  const allProgramRows = programData.list || [];
+  const programList = onlyWithLetter
+    ? allProgramRows.filter((row) => row.acceptanceLetterGeneratedAt)
+    : allProgramRows;
+  const programSummary = programData.summary || {};
+
+  // Payment proof status badge, shared by both views
+  const renderPaymentBadge = (row) => {
+    if (row.isPaid) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+          ✓ Paid
+        </span>
+      );
+    }
+    if (row.paymentProofStatus === 'pending') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+          ⏳ In review
+        </span>
+      );
+    }
+    if (row.paymentProofStatus === 'rejected') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+          ✗ Rejected
+        </span>
+      );
+    }
+    return <span className="text-gray-400 text-sm">Not uploaded</span>;
+  };
+
   return (
     <div className="min-h-screen bg-mesh-gradient relative">
       <div className="ambient-orb-1" />
@@ -172,8 +259,14 @@ export default function AdminInvoiceStats() {
       <div className="container mx-auto px-4 py-8 max-w-7xl xl:max-w-[1500px] 2xl:max-w-[1800px]">
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Invoice Statistics (MIRI)</h1>
-            <p className="text-gray-600 mt-1">Overview of generated invoices, payment deadlines and estimated revenue</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              {view === 'MIRI' ? 'Invoice Statistics (MIRI)' : `Payments (${PROGRAM_PAYMENT_VIEW})`}
+            </h1>
+            <p className="text-gray-600 mt-1">
+              {view === 'MIRI'
+                ? 'Overview of generated invoices, payment deadlines and estimated revenue'
+                : `${PROGRAM_PAYMENT_VIEW} students pay without an invoice: this tracks their payment proofs`}
+            </p>
           </div>
           <Link
             to="/admin"
@@ -186,12 +279,167 @@ export default function AdminInvoiceStats() {
           </Link>
         </div>
 
+        {/* Program views: MIRI bills with invoices, other programs only track payment proofs */}
+        <div className="mb-6 flex flex-wrap gap-2">
+          {['MIRI', PROGRAM_PAYMENT_VIEW].map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setView(tab)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                view === tab
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'glass-card bg-white/40 text-gray-700 hover:bg-white/70'
+              }`}
+            >
+              {tab === 'MIRI' ? 'MIRI · Invoices' : `${tab} · Payments`}
+            </button>
+          ))}
+        </div>
+
         {error && (
           <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700">
             {error}
           </div>
         )}
 
+        {view === PROGRAM_PAYMENT_VIEW ? (
+          <>
+            {/* Summary cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <div className="glass-card p-6">
+                <p className="text-sm text-gray-600 mb-1">Students in program</p>
+                <p className="text-2xl font-bold text-gray-900">{programSummary.totalStudents ?? 0}</p>
+                <p className="text-sm text-gray-500 mt-1">{programSummary.letterSent ?? 0} with decision letter</p>
+              </div>
+              <div className="glass-card p-6 bg-green-50/80 border border-green-200/60">
+                <p className="text-sm text-gray-700 mb-1">Paid</p>
+                <p className="text-2xl font-bold text-green-700">{programSummary.paid ?? 0}</p>
+              </div>
+              <div className="glass-card p-6">
+                <p className="text-sm text-gray-600 mb-1">Pending review</p>
+                <p className="text-2xl font-bold text-amber-600">{programSummary.pendingReview ?? 0}</p>
+                {(programSummary.rejected ?? 0) > 0 && (
+                  <p className="text-sm text-red-600 mt-1">{programSummary.rejected} rejected</p>
+                )}
+              </div>
+              <div className="glass-card p-6">
+                <p className="text-sm text-gray-600 mb-1">No proof uploaded</p>
+                <p className="text-2xl font-bold text-gray-900">{programSummary.notUploaded ?? 0}</p>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="glass-card overflow-hidden">
+              <div className="p-6 border-b border-gray-200/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">{PROGRAM_PAYMENT_VIEW} students</h2>
+                  <p className="text-sm text-gray-500">Decision letter, payment status and uploaded proof per student</p>
+                  <label className="mt-2 inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={onlyWithLetter}
+                      onChange={(e) => setOnlyWithLetter(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    Only students with decision letter
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadExcel}
+                  disabled={exportingExcel || programList.length === 0}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {exportingExcel ? 'Downloading…' : 'Download Excel'}
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                {programList.length === 0 ? (
+                  <div className="p-12 text-center text-gray-500">No {PROGRAM_PAYMENT_VIEW} students yet.</div>
+                ) : (
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-gray-50/80 border-b border-gray-200">
+                        <th className="px-4 py-3 text-sm font-semibold text-gray-700">Student</th>
+                        <th className="px-2 sm:px-3 py-3 text-left text-xs font-semibold text-gray-700 whitespace-nowrap">Student Code</th>
+                        <th className="px-4 py-3 text-sm font-semibold text-gray-700">Decision letter</th>
+                        <th className="px-4 py-3 text-sm font-semibold text-gray-700">Payment</th>
+                        <th className="px-4 py-3 text-sm font-semibold text-gray-700">Proof uploaded</th>
+                        <th className="px-4 py-3 text-sm font-semibold text-gray-700">Payment proof</th>
+                        <th className="px-4 py-3 text-sm font-semibold text-gray-700">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {programList.map((row, idx) => (
+                        <tr key={row.userId?.toString() || idx} className="border-b border-gray-100 hover:bg-gray-50/50">
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-gray-900">{row.userName || '—'}</div>
+                            <div className="text-xs text-gray-500">{row.userEmail || '—'}</div>
+                          </td>
+                          <td className="px-2 sm:px-3 py-3 whitespace-nowrap min-w-[13rem]">
+                            <p className="text-gray-700 text-xs font-medium">{row.studentCode || '—'}</p>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {row.acceptanceLetterGeneratedAt ? formatDate(row.acceptanceLetterGeneratedAt) : (
+                              <span className="text-gray-400">Not sent</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">{renderPaymentBadge(row)}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {row.paymentProofUploadedAt ? formatDate(row.paymentProofUploadedAt) : '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            {row.hasPaymentProof ? (
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadPaymentProof(row.userId, row.userName)}
+                                disabled={downloadingProofUserId === row.userId}
+                                className="inline-flex items-center gap-1.5 text-purple-600 hover:text-purple-700 font-medium text-sm disabled:opacity-50"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                {downloadingProofUserId === row.userId ? '…' : 'Proof'}
+                              </button>
+                            ) : (
+                              <span className="text-gray-400 text-sm">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {row.isPaid ? (
+                              <button
+                                type="button"
+                                onClick={() => handleMarkUnpaid(row.userId)}
+                                disabled={markingUnpaidUserId === row.userId}
+                                className="text-xs font-medium text-amber-700 hover:text-amber-800 underline disabled:opacity-50"
+                              >
+                                {markingUnpaidUserId === row.userId ? '…' : 'Mark unpaid'}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleMarkPaid(row.userId, row.hasPaymentProof)}
+                                disabled={markingPaidUserId === row.userId}
+                                className="text-xs font-medium text-green-700 hover:text-green-800 underline disabled:opacity-50"
+                              >
+                                {markingPaidUserId === row.userId ? '…' : 'Mark paid'}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
         {/* Summary cards */}
         {summary && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -411,6 +659,8 @@ export default function AdminInvoiceStats() {
             )}
           </div>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

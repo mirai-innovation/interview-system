@@ -855,6 +855,110 @@ router.get("/invoice-stats/export", async (req, res) => {
   }
 });
 
+// ----- Program payments (programs without the MIRI invoice flow, e.g. EMFUTECH) -----
+// These users upload a payment proof right after their decision letter: there is no
+// date range and no invoice amount, so this tracks payment state per student.
+async function getProgramPaymentsData(program) {
+  const users = await User.find({ program })
+    .select("name email program digitalId createdAt")
+    .sort({ name: 1 })
+    .lean();
+
+  const applications = await Application.find({ userId: { $in: users.map((u) => u._id) } })
+    .select(
+      "userId acceptanceLetterGeneratedAt paymentProofUrl paymentProofStatus " +
+        "paymentProofUploadedAt paymentProofApprovedAt promotionalCode registrationCode"
+    )
+    .lean();
+  const appByUserId = new Map(applications.map((a) => [a.userId.toString(), a]));
+
+  const list = users.map((user) => {
+    const app = appByUserId.get(user._id.toString());
+    return {
+      userId: user._id,
+      userName: user.name,
+      userEmail: user.email,
+      studentCode: resolveStudentCode(user, app),
+      acceptanceLetterGeneratedAt: app?.acceptanceLetterGeneratedAt ?? null,
+      paymentProofStatus: app?.paymentProofStatus ?? null,
+      paymentProofUploadedAt: app?.paymentProofUploadedAt ?? null,
+      paymentProofApprovedAt: app?.paymentProofApprovedAt ?? null,
+      hasPaymentProof: !!app?.paymentProofUrl,
+      isPaid: app?.paymentProofStatus === "approved",
+    };
+  });
+
+  const summary = {
+    program,
+    totalStudents: list.length,
+    paid: list.filter((r) => r.isPaid).length,
+    pendingReview: list.filter((r) => r.paymentProofStatus === "pending").length,
+    rejected: list.filter((r) => r.paymentProofStatus === "rejected").length,
+    notUploaded: list.filter((r) => !r.hasPaymentProof).length,
+    letterSent: list.filter((r) => r.acceptanceLetterGeneratedAt).length,
+  };
+
+  return { list, summary };
+}
+
+function resolveProgramParam(value) {
+  const program = String(value || "").toUpperCase();
+  return VALID_PROGRAMS.includes(program) ? program : null;
+}
+
+// Payment tracking for a given program (admin only)
+router.get("/program-payments", async (req, res) => {
+  try {
+    const program = resolveProgramParam(req.query.program);
+    if (!program) {
+      return res.status(400).json({ message: "A valid 'program' query parameter is required." });
+    }
+    const { list, summary } = await getProgramPaymentsData(program);
+    res.json({ list, summary });
+  } catch (error) {
+    console.error("Error fetching program payments:", error);
+    res.status(500).json({ message: "Error fetching program payments" });
+  }
+});
+
+// Export program payments to Excel (admin only)
+router.get("/program-payments/export", async (req, res) => {
+  try {
+    const program = resolveProgramParam(req.query.program);
+    if (!program) {
+      return res.status(400).json({ message: "A valid 'program' query parameter is required." });
+    }
+    const { list } = await getProgramPaymentsData(program);
+    const rows = list.map((row) => ({
+      "User": row.userName ?? "—",
+      "Email": row.userEmail ?? "—",
+      "Student Code": row.studentCode ?? "—",
+      "Decision Letter": row.acceptanceLetterGeneratedAt ? formatDateForExport(row.acceptanceLetterGeneratedAt) : "Not sent",
+      "Payment Status": row.isPaid
+        ? "Paid"
+        : row.paymentProofStatus === "pending"
+        ? "Pending review"
+        : row.paymentProofStatus === "rejected"
+        ? "Rejected"
+        : "Not uploaded",
+      "Proof Uploaded": row.paymentProofUploadedAt ? formatDateForExport(row.paymentProofUploadedAt) : "—",
+      "Approved At": row.paymentProofApprovedAt ? formatDateForExport(row.paymentProofApprovedAt) : "—",
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, `${program} Payments`.slice(0, 31));
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    const filename = `${program}_Payments_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.send(buf);
+  } catch (error) {
+    console.error("Error exporting program payments to Excel:", error);
+    res.status(500).json({ message: "Error exporting program payments to Excel" });
+  }
+});
+
 // List users awaiting decision letter (interview submitted, no acceptance letter yet)
 router.get("/pending-decision-letters", async (req, res) => {
   try {
