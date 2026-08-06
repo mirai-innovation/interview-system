@@ -4,6 +4,13 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  /* Reserve the scrollbar space so short pages (loading states) and tall pages
+     line up: without it, centered content shifts sideways when the scrollbar
+     appears. No-op on systems with overlay scrollbars, e.g. macOS. */
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',

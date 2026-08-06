@@ -177,9 +177,12 @@ export default function AdminInvoiceStats() {
     else fetchProgramPayments();
   }, [view, fetchStats, fetchProgramPayments]);
 
+  // Loading uses the same page wrapper as the loaded state: centering the whole
+  // page would turn the navbar into a centered flex item and make it jump once
+  // the data arrives. Only the spinner block is centered.
   if (loading) {
     return (
-      <div className="min-h-screen bg-mesh-gradient flex items-center justify-center">
+      <div className="min-h-screen bg-mesh-gradient relative">
         <div className="ambient-orb-1" />
         <div className="ambient-orb-2" />
         <div className="ambient-orb-3" />
