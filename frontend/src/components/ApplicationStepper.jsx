@@ -128,6 +128,9 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
   };
 
   const handlePayRegistrationFee = async () => {
+    // Open the tab synchronously, before the request, so popup blockers treat it as a user action.
+    const checkoutWindow = window.open('', '_blank');
+    if (checkoutWindow) checkoutWindow.opener = null;
     setPayingFee(true);
     try {
       const response = await api.post('/application/registration-fee/checkout');
@@ -135,8 +138,15 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
       if (!checkoutUrl) {
         throw new Error('Checkout URL not received');
       }
-      window.location.href = checkoutUrl;
+      if (checkoutWindow) {
+        checkoutWindow.location.href = checkoutUrl;
+        setPayingFee(false);
+      } else {
+        // Popup blocked: fall back to redirecting this tab.
+        window.location.href = checkoutUrl;
+      }
     } catch (error) {
+      checkoutWindow?.close();
       alert(error.response?.data?.message || error.message || 'Error starting payment.');
       setPayingFee(false);
     }
