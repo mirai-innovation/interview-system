@@ -115,6 +115,7 @@ const Register = () => {
               <option value="">Select...</option>
               <option value="EMFUTECH">EMFUTECH</option>
               <option value="MIRI">MIRI</option>
+              <option value="FUTURE_INNOVATORS_JAPAN">Future Innovators Japan selection entry</option>
             </select>
           </div>
 
