@@ -11,6 +11,7 @@ import Interview from './pages/Interview';
 import Results from './pages/Results';
 import AdminPanel from './pages/AdminPanel';
 import AdminInvoiceStats from './pages/AdminInvoiceStats';
+import AdminFijReapply from './pages/AdminFijReapply';
 import AdminInvoicePdfDownload from './pages/AdminInvoicePdfDownload';
 import ApplicationForm from './pages/ApplicationForm';
 import ScheduleScreening from './pages/ScheduleScreening';
@@ -90,6 +91,14 @@ function App() {
             element={
               <AdminRoute>
                 <AdminInvoiceStats />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/fij-reapply"
+            element={
+              <AdminRoute>
+                <AdminFijReapply />
               </AdminRoute>
             }
           />

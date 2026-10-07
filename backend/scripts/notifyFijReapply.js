@@ -4,7 +4,12 @@ import User from '../models/User.js';
 import Application from '../models/Application.js';
 import connectDB from '../config/db.js';
 import { sendFijReapplyInvitation } from '../config/email.js';
-import { FIJ_PROGRAM, FIJ_CURRENT_ROUND_OPENED_AT, isFijReapplyEligible } from '../utils/fijReapply.js';
+import {
+  FIJ_PROGRAM,
+  FIJ_CURRENT_ROUND_OPENED_AT,
+  FIJ_REAPPLY_DEADLINE_LABEL,
+  isFijReapplyEligible,
+} from '../utils/fijReapply.js';
 
 dotenv.config();
 
@@ -16,8 +21,8 @@ dotenv.config();
 //   node scripts/notifyFijReapply.js --send     -> send emails
 //   node scripts/notifyFijReapply.js --send --to someone@example.com  -> send to one eligible user only
 // Users already notified (fijReapplyNotifiedAt) are skipped, so the script can be re-run safely.
+// The same can be done from the admin panel at /admin/fij-reapply.
 
-const DEADLINE_LABEL = 'December 18, 2026';
 const DELAY_BETWEEN_EMAILS_MS = 2000; // ~30 emails/minute, safe for Gmail
 
 const args = process.argv.slice(2);
@@ -59,7 +64,7 @@ async function notifyFijReapply() {
       const app = appByUserId.get(user._id.toString());
       const fullName = app?.firstName && app?.lastName ? `${app.firstName} ${app.lastName}` : user.name;
 
-      const result = await sendFijReapplyInvitation(user.email, fullName, DEADLINE_LABEL);
+      const result = await sendFijReapplyInvitation(user.email, fullName, FIJ_REAPPLY_DEADLINE_LABEL);
       if (result.success) {
         await User.updateOne({ _id: user._id }, { $set: { fijReapplyNotifiedAt: new Date() } });
         sent++;

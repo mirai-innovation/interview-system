@@ -6,7 +6,21 @@ import User from "../models/User.js";
 import Application from "../models/Application.js";
 import { authMiddleware } from "./authRoutes.js";
 import { adminMiddleware } from "../middleware/adminMiddleware.js";
-import { sendBulkEmailToActiveUsers, sendReportResponseNotification, sendAcceptanceLetterReadyNotification } from "../config/email.js";
+import {
+  sendBulkEmailToActiveUsers,
+  sendReportResponseNotification,
+  sendAcceptanceLetterReadyNotification,
+  buildFijReapplyInvitation,
+  sendFijReapplyInvitation,
+} from "../config/email.js";
+import {
+  FIJ_PROGRAM,
+  FIJ_CURRENT_ROUND,
+  FIJ_CURRENT_ROUND_OPENED_AT,
+  FIJ_REAPPLY_DEADLINE,
+  FIJ_REAPPLY_DEADLINE_LABEL,
+  isFijReapplyEligible,
+} from "../utils/fijReapply.js";
 import * as XLSX from "xlsx";
 import archiver from "archiver";
 import { streamAcceptanceLetterPdf, generateAcceptanceLetterPdfBuffer } from "../utils/acceptanceLetterPdf.js";
@@ -1816,6 +1830,134 @@ router.post("/acceptance-letter/notify-bulk", async (req, res) => {
   } catch (error) {
     console.error("Error in bulk acceptance letter notify:", error);
     res.status(500).json({ message: "Error processing bulk acceptance letter notification" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Future Innovators Japan: invite first-round applicants to the new call
+// ---------------------------------------------------------------------------
+
+const fullNameOf = (user, application) =>
+  application?.firstName && application?.lastName ? `${application.firstName} ${application.lastName}` : user.name;
+
+// First-round FIJ applicants with their reapply status
+router.get("/fij-reapply", async (req, res) => {
+  try {
+    const users = await User.find({ program: FIJ_PROGRAM, createdAt: { $lt: FIJ_CURRENT_ROUND_OPENED_AT } })
+      .select("name email program createdAt cvAnalyzed interviewCompleted fijReapplyNotifiedAt")
+      .sort({ name: 1 });
+    const applications = await Application.find({ userId: { $in: users.map((u) => u._id) } })
+      .select("userId firstName lastName step1Completed applicationRound")
+      .lean();
+    const appByUserId = new Map(applications.map((a) => [a.userId.toString(), a]));
+
+    const list = users
+      .map((user) => {
+        const app = appByUserId.get(user._id.toString());
+        const reapplied = app?.applicationRound === FIJ_CURRENT_ROUND;
+        const eligible = isFijReapplyEligible(user, app);
+        // Users who never made progress in the first round can simply continue; they are not listed
+        if (!reapplied && !eligible) return null;
+        return {
+          _id: user._id,
+          name: fullNameOf(user, app),
+          email: user.email,
+          eligible,
+          reapplied,
+          notifiedAt: user.fijReapplyNotifiedAt || null,
+        };
+      })
+      .filter(Boolean);
+
+    res.json({
+      round: FIJ_CURRENT_ROUND,
+      deadline: FIJ_REAPPLY_DEADLINE,
+      deadlineLabel: FIJ_REAPPLY_DEADLINE_LABEL,
+      summary: {
+        total: list.length,
+        notified: list.filter((u) => u.notifiedAt).length,
+        reapplied: list.filter((u) => u.reapplied).length,
+      },
+      list,
+    });
+  } catch (error) {
+    console.error("Error loading FIJ reapply list:", error);
+    res.status(500).json({ message: "Error loading Future Innovators Japan applicants" });
+  }
+});
+
+// Rendered invitation email, for previewing in the admin panel
+router.get("/fij-reapply/preview", async (req, res) => {
+  const name = typeof req.query.name === "string" && req.query.name.trim() ? req.query.name.trim() : "Applicant Name";
+  res.json(buildFijReapplyInvitation(name, FIJ_REAPPLY_DEADLINE_LABEL));
+});
+
+// Send the invitation to any address as a test; does not mark anyone as notified
+router.post("/fij-reapply/test", async (req, res) => {
+  try {
+    const email = typeof req.body.email === "string" ? req.body.email.trim() : "";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: "A valid email address is required." });
+    }
+    const name = typeof req.body.name === "string" && req.body.name.trim() ? req.body.name.trim() : "Applicant Name";
+    const result = await sendFijReapplyInvitation(email, name, FIJ_REAPPLY_DEADLINE_LABEL);
+    if (!result.success) {
+      return res.status(502).json({ message: `Email could not be sent: ${result.error}` });
+    }
+    res.json({ message: `Test email sent to ${email}.` });
+  } catch (error) {
+    console.error("Error sending FIJ reapply test email:", error);
+    res.status(500).json({ message: "Error sending test email" });
+  }
+});
+
+// Send the invitation to selected eligible users. The panel sends small batches so each
+// request stays well under the serverless time limit.
+const FIJ_NOTIFY_MAX_BATCH = 10;
+router.post("/fij-reapply/notify", async (req, res) => {
+  try {
+    const { userIds } = req.body;
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ message: "userIds array is required and must not be empty." });
+    }
+    if (userIds.length > FIJ_NOTIFY_MAX_BATCH) {
+      return res.status(400).json({ message: `Send at most ${FIJ_NOTIFY_MAX_BATCH} users per request.` });
+    }
+
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const results = [];
+    for (let i = 0; i < userIds.length; i++) {
+      const userId = userIds[i];
+      try {
+        const user = await User.findById(userId).select("name email program createdAt cvAnalyzed interviewCompleted");
+        const application = user ? await Application.findOne({ userId }).select("firstName lastName step1Completed applicationRound") : null;
+        if (!user || !isFijReapplyEligible(user, application)) {
+          results.push({ userId, email: user?.email || null, success: false, reason: "Not eligible" });
+          continue;
+        }
+        const emailResult = await sendFijReapplyInvitation(user.email, fullNameOf(user, application), FIJ_REAPPLY_DEADLINE_LABEL);
+        if (!emailResult.success) {
+          results.push({ userId, email: user.email, success: false, reason: emailResult.error });
+          continue;
+        }
+        const notifiedAt = new Date();
+        await User.updateOne({ _id: userId }, { $set: { fijReapplyNotifiedAt: notifiedAt } });
+        results.push({ userId, email: user.email, success: true, notifiedAt });
+      } catch (err) {
+        results.push({ userId, email: null, success: false, reason: err.message || "Unknown error" });
+      }
+      // Avoid Gmail rate limits
+      if (i < userIds.length - 1) await delay(2000);
+    }
+
+    res.json({
+      sent: results.filter((r) => r.success).length,
+      failed: results.filter((r) => !r.success).length,
+      results,
+    });
+  } catch (error) {
+    console.error("Error sending FIJ reapply invitations:", error);
+    res.status(500).json({ message: "Error sending invitations" });
   }
 });
 

@@ -846,21 +846,18 @@ Evaluation Committee`;
 };
 
 /**
- * Invite a first-round Future Innovators Japan applicant to apply to the new call from their dashboard.
- * @param {string} userEmail - User email
+ * Invitation for a first-round Future Innovators Japan applicant to apply to the new call from their dashboard.
  * @param {string} userName - User name
  * @param {string} deadlineLabel - Human-readable deadline, e.g. 'December 18, 2026'
+ * @returns {{ subject: string, text: string, html: string }}
  */
-export const sendFijReapplyInvitation = async (userEmail, userName, deadlineLabel) => {
-  try {
-    const transporter = createTransporter();
+export const buildFijReapplyInvitation = (userName, deadlineLabel) => {
+  const portalBase = process.env.STUDENT_PORTAL_URL || process.env.FRONTEND_URL || 'https://studentportal.mirai-education.tech';
+  const dashboardUrl = `${portalBase.replace(/\/$/, '')}/dashboard`;
+  const safeUserName = escapeHtml(userName || 'Applicant');
+  const safeDeadline = escapeHtml(deadlineLabel);
 
-    const portalBase = process.env.STUDENT_PORTAL_URL || process.env.FRONTEND_URL || 'https://studentportal.mirai-education.tech';
-    const dashboardUrl = `${portalBase.replace(/\/$/, '')}/dashboard`;
-    const safeUserName = escapeHtml(userName || 'Applicant');
-    const safeDeadline = escapeHtml(deadlineLabel);
-
-    const textVersion = `Mirai Innovation Research Institute - A new Future Innovators Japan call is open
+  const textVersion = `Mirai Innovation Research Institute - A new Future Innovators Japan call is open
 
 Hello ${userName || 'Applicant'},
 
@@ -878,7 +875,7 @@ Best regards,
 Mirai Innovation Research Institute
 Evaluation Committee`;
 
-    const htmlVersion = `
+  const htmlVersion = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -888,75 +885,86 @@ Evaluation Committee`;
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td style="padding: 20px 0; text-align: center; background-color: #ffffff;">
-        <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff;">
-          <tr>
-            <td style="padding: 40px 30px; text-align: center; border-bottom: 3px solid #2563eb;">
-              <h1 style="margin: 0; color: #1e40af; font-size: 24px; font-weight: bold;">
-                Mirai Innovation Research Institute
-              </h1>
-              <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px;">
-                Evaluation and Selection System
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 40px 30px;">
-              <h2 style="margin: 0 0 20px 0; color: #1e293b; font-size: 22px; font-weight: 600; text-align: center;">
-                A new Future Innovators Japan call is open
-              </h2>
-              <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-                Hello <strong>${safeUserName}</strong>,
-              </p>
-              <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-                A new call for the <strong>Future Innovators Japan Selection Entry</strong> is now open, and as a previous applicant you can apply again.
-              </p>
-              <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-                Log in to your <strong>Dashboard</strong> and click <strong>Apply again</strong>. Your previous application form answers will be pre-filled, so you only need to review them, upload your CV and complete the AI interview again.
-              </p>
-              <p style="margin: 0 0 30px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-                The deadline to apply is <strong>${safeDeadline}</strong>.
-              </p>
-              <div style="text-align: center; margin-top: 30px;">
-                <a href="${dashboardUrl}" style="display: inline-block; padding: 14px 32px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
-                  Go to my Dashboard
-                </a>
-              </div>
-              <p style="margin: 30px 0 0 0; color: #64748b; font-size: 14px; line-height: 1.6;">
-                If you have any questions, please contact our support team.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 30px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
-              <p style="margin: 0 0 10px 0; color: #64748b; font-size: 12px;">
-                <strong>Mirai Innovation Research Institute</strong>
-              </p>
-              <p style="margin: 0; color: #94a3b8; font-size: 11px; line-height: 1.6;">
-                Edge Honmachi Bldg 3F<br>
-                2-3-12 Minamihonmachi, Chuo-ku, Osaka, Japan 541-0054<br>
-                <a href="mailto:contact@mirai-innovation-lab.com" style="color: #2563eb; text-decoration: none;">contact@mirai-innovation-lab.com</a>
-              </p>
-              <p style="margin: 15px 0 0 0; color: #cbd5e1; font-size: 11px;">
-                This is an automated email, please do not reply to this message.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
+  <tr>
+    <td style="padding: 20px 0; text-align: center; background-color: #ffffff;">
+      <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff;">
+        <tr>
+          <td style="padding: 40px 30px; text-align: center; border-bottom: 3px solid #2563eb;">
+            <h1 style="margin: 0; color: #1e40af; font-size: 24px; font-weight: bold;">
+              Mirai Innovation Research Institute
+            </h1>
+            <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px;">
+              Evaluation and Selection System
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 40px 30px; text-align: left;">
+            <h2 style="margin: 0 0 20px 0; color: #1e293b; font-size: 22px; font-weight: 600; text-align: center;">
+              A new Future Innovators Japan call is open
+            </h2>
+            <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
+              Hello <strong>${safeUserName}</strong>,
+            </p>
+            <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
+              A new call for the <strong>Future Innovators Japan Selection Entry</strong> is now open, and as a previous applicant you can apply again.
+            </p>
+            <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
+              Log in to your <strong>Dashboard</strong> and click <strong>Apply again</strong>. Your previous application form answers will be pre-filled, so you only need to review them, upload your CV and complete the AI interview again.
+            </p>
+            <p style="margin: 0 0 30px 0; color: #475569; font-size: 16px; line-height: 1.6;">
+              The deadline to apply is <strong>${safeDeadline}</strong>.
+            </p>
+            <div style="text-align: center; margin-top: 30px;">
+              <a href="${dashboardUrl}" style="display: inline-block; padding: 14px 32px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                Go to my Dashboard
+              </a>
+            </div>
+            <p style="margin: 30px 0 0 0; color: #64748b; font-size: 14px; line-height: 1.6;">
+              If you have any questions, please contact our support team.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 30px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
+            <p style="margin: 0 0 10px 0; color: #64748b; font-size: 12px;">
+              <strong>Mirai Innovation Research Institute</strong>
+            </p>
+            <p style="margin: 0; color: #94a3b8; font-size: 11px; line-height: 1.6;">
+              Edge Honmachi Bldg 3F<br>
+              2-3-12 Minamihonmachi, Chuo-ku, Osaka, Japan 541-0054<br>
+              <a href="mailto:contact@mirai-innovation-lab.com" style="color: #2563eb; text-decoration: none;">contact@mirai-innovation-lab.com</a>
+            </p>
+            <p style="margin: 15px 0 0 0; color: #cbd5e1; font-size: 11px;">
+              This is an automated email, please do not reply to this message.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
   </table>
 </body>
 </html>`;
 
+  return {
+    subject: 'A new Future Innovators Japan call is open - Mirai Innovation Research Institute',
+    text: textVersion,
+    html: htmlVersion,
+  };
+};
+
+export const sendFijReapplyInvitation = async (userEmail, userName, deadlineLabel) => {
+  try {
+    const transporter = createTransporter();
+    const { subject, text, html } = buildFijReapplyInvitation(userName, deadlineLabel);
     const result = await transporter.sendMail({
       from: `"Mirai Innovation Research Institute" <${process.env.EMAIL_USER}>`,
       to: userEmail,
       replyTo: process.env.EMAIL_USER,
-      subject: 'A new Future Innovators Japan call is open - Mirai Innovation Research Institute',
-      text: textVersion,
-      html: htmlVersion,
+      subject,
+      text,
+      html,
     });
     return { success: true, messageId: result.messageId };
   } catch (error) {
