@@ -71,6 +71,9 @@ const userSchema = new mongoose.Schema(
       totalScore: { type: Number }
     },
     hardSkillsSurveyCompleted: { type: Boolean, default: false },
+
+    // When the invitation to the second Future Innovators Japan round was emailed
+    fijReapplyNotifiedAt: { type: Date },
   },
   { timestamps: true }
 );

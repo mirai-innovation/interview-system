@@ -14,7 +14,8 @@
     "generate-recommendations": "node scripts/generateRecommendations.js",
     "export-user-data": "node scripts/exportUserData.js",
     "export-missing-users": "node scripts/exportMissingUsers.js",
-    "import-miri-csv": "node scripts/importMiriCsv.js"
+    "import-miri-csv": "node scripts/importMiriCsv.js",
+    "notify-fij-reapply": "node scripts/notifyFijReapply.js"
   },
   "keywords": [
     "evaluation",

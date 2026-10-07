@@ -1518,6 +1518,9 @@ const AdminPanel = () => {
                         <option value="FUTURE_INNOVATORS_JAPAN">FUTURE_INNOVATORS_JAPAN</option>
                         <option value="OTHER">OTHER</option>
                       </select>
+                      {user.applicationRound && (
+                        <span className="block mt-1 text-[11px] font-semibold text-blue-700">{user.applicationRound}</span>
+                      )}
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
                       <div className="flex flex-col gap-1">

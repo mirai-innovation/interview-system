@@ -81,7 +81,7 @@ router.get("/users", async (req, res) => {
     const applications = await Application.find({ userId: { $in: userIds } })
       .select(
         "userId acceptanceLetterGeneratedAt acceptanceLetterProgramType promotionalCode registrationCode " +
-          "registrationFeeStatus registrationFeePaidAt paymentProofStatus paymentProofUploadedAt"
+          "registrationFeeStatus registrationFeePaidAt paymentProofStatus paymentProofUploadedAt applicationRound"
       )
       .lean();
     const appByUserId = new Map(applications.map((a) => [a.userId.toString(), a]));
@@ -98,6 +98,7 @@ router.get("/users", async (req, res) => {
         registrationFeePaidAt: app?.registrationFeePaidAt ?? null,
         paymentProofStatus: app?.paymentProofStatus ?? null,
         paymentProofUploadedAt: app?.paymentProofUploadedAt ?? null,
+        applicationRound: app?.applicationRound ?? null,
       };
     });
 

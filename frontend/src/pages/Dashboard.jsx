@@ -54,6 +54,7 @@ const Dashboard = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [reapplying, setReapplying] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -99,6 +100,21 @@ const Dashboard = () => {
       console.error('Error fetching profile:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReapply = async () => {
+    if (!window.confirm('Start a new application for this call? Your previous form answers will be pre-filled, and you will upload your CV and complete the AI interview again.')) {
+      return;
+    }
+    setReapplying(true);
+    try {
+      await api.post('/application/reapply');
+      await Promise.all([fetchApplicationStatus(), fetchProfile()]);
+    } catch (error) {
+      alert(error.response?.data?.message || 'Error starting your new application. Please try again.');
+    } finally {
+      setReapplying(false);
     }
   };
 
@@ -174,6 +190,30 @@ const Dashboard = () => {
       
       <Navbar />
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-7xl">
+        {applicationStatus?.reapply?.eligible && (
+          <div className="glass-card p-4 sm:p-6 mb-6 sm:mb-8 border-2 border-blue-400">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex-1">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">A new Future Innovators Japan call is open</h2>
+                <p className="text-sm sm:text-base text-gray-600 mt-1">
+                  As a previous applicant you can apply again. Your application form will be pre-filled with your previous answers; you will upload your CV and complete the AI interview again.
+                  {' '}Deadline:{' '}
+                  <strong>
+                    {new Date(applicationStatus.reapply.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Tokyo' })}
+                  </strong>.
+                </p>
+              </div>
+              <button
+                onClick={handleReapply}
+                disabled={reapplying}
+                className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-6 py-3 rounded-xl shadow-lg transition-all"
+              >
+                {reapplying ? 'Starting…' : 'Apply again'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Your Journey card: circle progress + Application Progress (only active steps: AI Interview + Acceptance Letter) */}
         <div className="glass-card p-4 sm:p-6 mb-6 sm:mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center gap-6 mb-6">

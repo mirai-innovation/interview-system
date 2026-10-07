@@ -14,6 +14,13 @@ import {
   getRegistrationFeeCheckoutLineItem,
   isRegistrationFeePaid,
 } from "../utils/registrationFee.js";
+import {
+  FIJ_CURRENT_ROUND,
+  getFijReapplyStatus,
+  isFijReapplyEligible,
+  isFijCurrentRoundRegistrant,
+  archiveAndResetForFijReapply,
+} from "../utils/fijReapply.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,7 +30,7 @@ const router = express.Router();
 router.get("/status", authMiddleware, async (req, res) => {
   try {
     const application = await Application.findOne({ userId: req.userId });
-    const user = await User.findById(req.userId).select("interviewCompleted cvAnalyzed");
+    const user = await User.findById(req.userId).select("interviewCompleted cvAnalyzed program createdAt");
     const effectiveStep2Completed = !!(application?.step2Completed || user?.interviewCompleted);
     const effectiveCurrentStep = Math.max(application?.currentStep || 1, effectiveStep2Completed ? 3 : 1);
     
@@ -54,6 +61,7 @@ router.get("/status", authMiddleware, async (req, res) => {
         registrationFeePaid: false,
         registrationFeeAmountUsd,
         stripeConfigured: isStripeConfigured(),
+        reapply: getFijReapplyStatus(user, null),
       });
     }
 
@@ -82,10 +90,33 @@ router.get("/status", authMiddleware, async (req, res) => {
       registrationFeePaid: isRegistrationFeePaid(application),
       registrationFeeAmountUsd,
       stripeConfigured: isStripeConfigured(),
+      applicationRound: application.applicationRound || null,
+      reapply: getFijReapplyStatus(user, application),
     });
   } catch (error) {
     console.error("Error fetching application status:", error);
     res.status(500).json({ message: "Error fetching application status" });
+  }
+});
+
+// Start the new Future Innovators Japan round: archive the previous one and reset progress
+router.post("/reapply", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    const application = await Application.findOne({ userId: req.userId });
+    if (!isFijReapplyEligible(user, application)) {
+      return res.status(403).json({ message: "You are not eligible to apply again at this time." });
+    }
+
+    await archiveAndResetForFijReapply(user, application);
+
+    res.json({ message: "Your new application has been started. Your previous answers are pre-filled." });
+  } catch (error) {
+    console.error("Error starting reapplication:", error);
+    res.status(500).json({ message: "Error starting your new application" });
   }
 });
 
@@ -122,6 +153,10 @@ router.put("/save", authMiddleware, async (req, res) => {
       isDraft: true,
       lastSavedAt: new Date(),
     };
+
+    // The round is assigned by the server, never by the form
+    delete applicationData.applicationRound;
+    if (isFijCurrentRoundRegistrant(user)) applicationData.applicationRound = FIJ_CURRENT_ROUND;
 
     // Remove step completion flags for draft saves
     delete applicationData.step1Completed;
@@ -227,6 +262,9 @@ router.put("/submit", authMiddleware, async (req, res) => {
       isDraft: false,
       lastSavedAt: new Date(),
     };
+    // The round is assigned by the server, never by the form
+    delete applicationData.applicationRound;
+    if (isFijCurrentRoundRegistrant(user)) applicationData.applicationRound = FIJ_CURRENT_ROUND;
 
     const application = await Application.findOneAndUpdate(
       { userId: req.userId },

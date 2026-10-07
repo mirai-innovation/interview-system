@@ -64,6 +64,9 @@ const applicationSchema = new mongoose.Schema(
     plagiarismCheckConfirmed: { type: Boolean, default: false },
     signature: { type: String },
     
+    // Call for applications this record belongs to, e.g. 'FIJ-2026-2'. Unset for first-round records.
+    applicationRound: { type: String },
+
     // Draft status
     isDraft: { type: Boolean, default: true },
     lastSavedAt: { type: Date, default: Date.now },
