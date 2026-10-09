@@ -5,6 +5,7 @@ import api from '../utils/axios';
 import ApplicationStepper from '../components/ApplicationStepper';
 import ConfirmDatesSection from '../components/ConfirmDatesSection';
 import RegisterPaymentSection from '../components/RegisterPaymentSection';
+import FijPaymentProofSection from '../components/FijPaymentProofSection';
 
 // Circular progress (same style as main / Results)
 const CircularProgress = ({ percentage, size = 120, color = 'blue' }) => {
@@ -104,7 +105,7 @@ const Dashboard = () => {
   };
 
   const handleReapply = async () => {
-    if (!window.confirm('Start a new application for this call? Your previous form answers will be pre-filled, and you will upload your CV and complete the AI interview again.')) {
+    if (!window.confirm('Start a new application for this call? You will upload your payment receipt first; your previous form answers will be pre-filled, and you will upload your CV and complete the AI interview again.')) {
       return;
     }
     setReapplying(true);
@@ -172,13 +173,15 @@ const Dashboard = () => {
   // Match ApplicationStepper: MIRI has 6 steps; EMFUTECH has 5; others cap at 4
   const isMIRI = profile?.program === 'MIRI';
   const isEMFUTECH = profile?.program === 'EMFUTECH';
-  const activeStepsTotal = isMIRI ? 6 : isEMFUTECH ? 5 : 4;
+  const fijPaymentProofRequired = applicationStatus?.fijPaymentProof?.required === true;
+  const activeStepsTotal = (isMIRI ? 6 : isEMFUTECH ? 5 : 4) + (fijPaymentProofRequired ? 1 : 0);
   const baseCompleted = applicationStatus
     ? [applicationStatus.step1Completed, applicationStatus.cvAnalyzed, applicationStatus.step2Completed, applicationStatus.step4Completed].filter(Boolean).length
     : 0;
   const registrationFeeCompleted = isMIRI && applicationStatus?.registrationFeePaid ? 1 : 0;
   const paymentCompleted = (isMIRI || isEMFUTECH) && applicationStatus?.paymentProofStatus === 'approved' ? 1 : 0;
-  const activeStepsCompleted = baseCompleted + registrationFeeCompleted + paymentCompleted;
+  const fijPaymentProofCompleted = fijPaymentProofRequired && applicationStatus?.fijPaymentProof?.uploadedAt ? 1 : 0;
+  const activeStepsCompleted = baseCompleted + registrationFeeCompleted + paymentCompleted + fijPaymentProofCompleted;
   const journeyPercentage = activeStepsTotal ? Math.round((activeStepsCompleted / activeStepsTotal) * 100) : 0;
 
   return (
@@ -196,7 +199,11 @@ const Dashboard = () => {
               <div className="flex-1">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900">A new Future Innovators Japan call is open</h2>
                 <p className="text-sm sm:text-base text-gray-600 mt-1">
-                  As a previous applicant you can apply again. Your application form will be pre-filled with your previous answers; you will upload your CV and complete the AI interview again.
+                  As a previous applicant you can apply again. First apply and pay on the{' '}
+                  <a href={applicationStatus.fijPaymentProof?.applicationUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                    program page
+                  </a>
+                  , then click Apply again and upload your payment receipt. Your application form will be pre-filled with your previous answers; you will upload your CV and complete the AI interview again.
                   {' '}Deadline:{' '}
                   <strong>
                     {new Date(applicationStatus.reapply.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Tokyo' })}
@@ -228,6 +235,7 @@ const Dashboard = () => {
             </div>
           </div>
           <ApplicationStepper applicationStatus={applicationStatus} onDownloadAcceptanceLetterSuccess={fetchApplicationStatus} program={profile?.program} />
+          <FijPaymentProofSection fijPaymentProof={applicationStatus?.fijPaymentProof} onSuccess={fetchApplicationStatus} />
           {isMIRI && applicationStatus?.registrationFeePaid && (
             <ConfirmDatesSection applicationStatus={applicationStatus} onSuccess={fetchApplicationStatus} />
           )}

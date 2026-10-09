@@ -64,6 +64,10 @@ const applicationSchema = new mongoose.Schema(
     plagiarismCheckConfirmed: { type: Boolean, default: false },
     signature: { type: String },
     
+    // Future Innovators Japan: receipt of the payment made on the program website (no admin review)
+    fijPaymentProofUrl: { type: String },
+    fijPaymentProofUploadedAt: { type: Date },
+
     // Call for applications this record belongs to, e.g. 'FIJ-2026-2'. Unset for first-round records.
     applicationRound: { type: String },
 

@@ -849,13 +849,15 @@ Evaluation Committee`;
  * Invitation for a first-round Future Innovators Japan applicant to apply to the new call from their dashboard.
  * @param {string} userName - User name
  * @param {string} deadlineLabel - Human-readable deadline, e.g. 'December 18, 2026'
+ * @param {string} applicationUrl - Program page where applicants apply and pay
  * @returns {{ subject: string, text: string, html: string }}
  */
-export const buildFijReapplyInvitation = (userName, deadlineLabel) => {
+export const buildFijReapplyInvitation = (userName, deadlineLabel, applicationUrl) => {
   const portalBase = process.env.STUDENT_PORTAL_URL || process.env.FRONTEND_URL || 'https://studentportal.mirai-education.tech';
   const dashboardUrl = `${portalBase.replace(/\/$/, '')}/dashboard`;
   const safeUserName = escapeHtml(userName || 'Applicant');
   const safeDeadline = escapeHtml(deadlineLabel);
+  const safeApplicationUrl = escapeHtml(applicationUrl);
 
   const textVersion = `Mirai Innovation Research Institute - A new Future Innovators Japan call is open
 
@@ -863,9 +865,15 @@ Hello ${userName || 'Applicant'},
 
 A new call for the Future Innovators Japan Selection Entry is now open, and as a previous applicant you can apply again.
 
-Log in to your dashboard and click "Apply again". Your previous application form answers will be pre-filled so you only need to review them, upload your CV and complete the AI interview again.
+To apply again:
 
+1. Apply and complete the payment on the program page:
+${applicationUrl}
+
+2. Log in to your dashboard and click "Apply again":
 ${dashboardUrl}
+
+3. Upload your payment receipt (PDF) as the first step. Then review your application form (your previous answers are pre-filled), upload your CV and complete the AI interview again.
 
 The deadline to apply is ${deadlineLabel}.
 
@@ -909,15 +917,23 @@ Evaluation Committee`;
             <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
               A new call for the <strong>Future Innovators Japan Selection Entry</strong> is now open, and as a previous applicant you can apply again.
             </p>
-            <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-              Log in to your <strong>Dashboard</strong> and click <strong>Apply again</strong>. Your previous application form answers will be pre-filled, so you only need to review them, upload your CV and complete the AI interview again.
+            <p style="margin: 0 0 10px 0; color: #475569; font-size: 16px; line-height: 1.6;">
+              To apply again:
             </p>
+            <ol style="margin: 0 0 20px 0; padding-left: 22px; color: #475569; font-size: 16px; line-height: 1.6;">
+              <li style="margin-bottom: 8px;">Apply and complete the payment on the <a href="${safeApplicationUrl}" style="color: #2563eb;">Future Innovators Japan program page</a>.</li>
+              <li style="margin-bottom: 8px;">Log in to your <strong>Dashboard</strong> and click <strong>Apply again</strong>.</li>
+              <li>Upload your <strong>payment receipt (PDF)</strong> as the first step. Then review your application form (your previous answers are pre-filled), upload your CV and complete the AI interview again.</li>
+            </ol>
             <p style="margin: 0 0 30px 0; color: #475569; font-size: 16px; line-height: 1.6;">
               The deadline to apply is <strong>${safeDeadline}</strong>.
             </p>
             <div style="text-align: center; margin-top: 30px;">
-              <a href="${dashboardUrl}" style="display: inline-block; padding: 14px 32px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
-                Go to my Dashboard
+              <a href="${safeApplicationUrl}" style="display: inline-block; margin: 0 6px 12px; padding: 14px 28px; background-color: #ffffff; color: #2563eb; border: 2px solid #2563eb; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                1. Apply &amp; pay
+              </a>
+              <a href="${dashboardUrl}" style="display: inline-block; margin: 0 6px 12px; padding: 16px 28px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                2. Go to my Dashboard
               </a>
             </div>
             <p style="margin: 30px 0 0 0; color: #64748b; font-size: 14px; line-height: 1.6;">
@@ -954,10 +970,10 @@ Evaluation Committee`;
   };
 };
 
-export const sendFijReapplyInvitation = async (userEmail, userName, deadlineLabel) => {
+export const sendFijReapplyInvitation = async (userEmail, userName, deadlineLabel, applicationUrl) => {
   try {
     const transporter = createTransporter();
-    const { subject, text, html } = buildFijReapplyInvitation(userName, deadlineLabel);
+    const { subject, text, html } = buildFijReapplyInvitation(userName, deadlineLabel, applicationUrl);
     const result = await transporter.sendMail({
       from: `"Mirai Innovation Research Institute" <${process.env.EMAIL_USER}>`,
       to: userEmail,

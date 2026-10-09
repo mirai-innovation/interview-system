@@ -19,6 +19,7 @@ import {
   FIJ_CURRENT_ROUND_OPENED_AT,
   FIJ_REAPPLY_DEADLINE,
   FIJ_REAPPLY_DEADLINE_LABEL,
+  FIJ_APPLICATION_URL,
   isFijReapplyEligible,
 } from "../utils/fijReapply.js";
 import * as XLSX from "xlsx";
@@ -1487,6 +1488,58 @@ router.delete("/users/:userId/payment-follow-up/notes/:noteId", async (req, res)
 });
 
 // Admin: download user's payment proof PDF (works in deployment: proxy from S3 instead of redirect)
+// Streams a stored payment proof PDF (S3 URL, S3 key or local file) as a download
+const sendStoredPaymentProof = async (res, urlOrPath, fileName) => {
+  const isUrl = urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://");
+  const setPdfHeaders = () => {
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+  };
+
+  // S3 full URL: fetch server-side and stream to client (avoids CORS / redirect issues in deployment)
+  if (isUrl) {
+    const response = await fetch(urlOrPath);
+    if (!response.ok) {
+      console.error("Payment proof fetch failed:", response.status, urlOrPath);
+      return res.status(502).json({ message: "Payment proof file could not be retrieved from storage." });
+    }
+    setPdfHeaders();
+    const buffer = await response.arrayBuffer();
+    return res.send(Buffer.from(buffer));
+  }
+
+  // S3 key (e.g. payment-proofs/xxx.pdf) when STORAGE_TYPE is s3
+  const storageType = process.env.STORAGE_TYPE || "local";
+  if (storageType === "s3" && process.env.AWS_BUCKET_NAME) {
+    const s3Key = urlOrPath.includes("/") ? urlOrPath : `payment-proofs/${urlOrPath}`;
+    const s3Client = new S3Client({
+      region: process.env.AWS_REGION,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      },
+    });
+    const command = new GetObjectCommand({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: s3Key,
+    });
+    const obj = await s3Client.send(command);
+    const stream = obj.Body;
+    if (!stream) return res.status(502).json({ message: "Payment proof stream not available." });
+    setPdfHeaders();
+    stream.pipe(res);
+    return;
+  }
+
+  // Local file
+  const filePath = path.join(process.cwd(), "uploads", "payment-proofs", path.basename(urlOrPath));
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ message: "Payment proof file not found on server." });
+  }
+  setPdfHeaders();
+  fs.createReadStream(filePath).pipe(res);
+};
+
 router.get("/users/:userId/payment-proof", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -1498,56 +1551,8 @@ router.get("/users/:userId/payment-proof", async (req, res) => {
       return res.status(404).json({ message: "No payment proof uploaded for this user." });
     }
 
-    const urlOrPath = application.paymentProofUrl;
-    const isUrl = urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://");
     const fileName = `Payment_Proof_${(user.name || "User").replace(/\s+/g, "_")}.pdf`;
-    const setPdfHeaders = () => {
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
-    };
-
-    // S3 full URL: fetch server-side and stream to client (avoids CORS / redirect issues in deployment)
-    if (isUrl) {
-      const response = await fetch(urlOrPath);
-      if (!response.ok) {
-        console.error("Payment proof fetch failed:", response.status, urlOrPath);
-        return res.status(502).json({ message: "Payment proof file could not be retrieved from storage." });
-      }
-      setPdfHeaders();
-      const buffer = await response.arrayBuffer();
-      return res.send(Buffer.from(buffer));
-    }
-
-    // S3 key (e.g. payment-proofs/xxx.pdf) when STORAGE_TYPE is s3
-    const storageType = process.env.STORAGE_TYPE || "local";
-    if (storageType === "s3" && process.env.AWS_BUCKET_NAME) {
-      const s3Key = urlOrPath.includes("/") ? urlOrPath : `payment-proofs/${urlOrPath}`;
-      const s3Client = new S3Client({
-        region: process.env.AWS_REGION,
-        credentials: {
-          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        },
-      });
-      const command = new GetObjectCommand({
-        Bucket: process.env.AWS_BUCKET_NAME,
-        Key: s3Key,
-      });
-      const obj = await s3Client.send(command);
-      const stream = obj.Body;
-      if (!stream) return res.status(502).json({ message: "Payment proof stream not available." });
-      setPdfHeaders();
-      stream.pipe(res);
-      return;
-    }
-
-    // Local file
-    const filePath = path.join(process.cwd(), "uploads", "payment-proofs", path.basename(urlOrPath));
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ message: "Payment proof file not found on server." });
-    }
-    setPdfHeaders();
-    fs.createReadStream(filePath).pipe(res);
+    await sendStoredPaymentProof(res, application.paymentProofUrl, fileName);
   } catch (error) {
     console.error("Error downloading payment proof:", error);
     res.status(500).json({ message: "Error downloading payment proof" });
@@ -1889,7 +1894,7 @@ router.get("/fij-reapply", async (req, res) => {
 // Rendered invitation email, for previewing in the admin panel
 router.get("/fij-reapply/preview", async (req, res) => {
   const name = typeof req.query.name === "string" && req.query.name.trim() ? req.query.name.trim() : "Applicant Name";
-  res.json(buildFijReapplyInvitation(name, FIJ_REAPPLY_DEADLINE_LABEL));
+  res.json(buildFijReapplyInvitation(name, FIJ_REAPPLY_DEADLINE_LABEL, FIJ_APPLICATION_URL));
 });
 
 // Send the invitation to any address as a test; does not mark anyone as notified
@@ -1900,7 +1905,7 @@ router.post("/fij-reapply/test", async (req, res) => {
       return res.status(400).json({ message: "A valid email address is required." });
     }
     const name = typeof req.body.name === "string" && req.body.name.trim() ? req.body.name.trim() : "Applicant Name";
-    const result = await sendFijReapplyInvitation(email, name, FIJ_REAPPLY_DEADLINE_LABEL);
+    const result = await sendFijReapplyInvitation(email, name, FIJ_REAPPLY_DEADLINE_LABEL, FIJ_APPLICATION_URL);
     if (!result.success) {
       return res.status(502).json({ message: `Email could not be sent: ${result.error}` });
     }
@@ -1935,7 +1940,7 @@ router.post("/fij-reapply/notify", async (req, res) => {
           results.push({ userId, email: user?.email || null, success: false, reason: "Not eligible" });
           continue;
         }
-        const emailResult = await sendFijReapplyInvitation(user.email, fullNameOf(user, application), FIJ_REAPPLY_DEADLINE_LABEL);
+        const emailResult = await sendFijReapplyInvitation(user.email, fullNameOf(user, application), FIJ_REAPPLY_DEADLINE_LABEL, FIJ_APPLICATION_URL);
         if (!emailResult.success) {
           results.push({ userId, email: user.email, success: false, reason: emailResult.error });
           continue;
@@ -1958,6 +1963,63 @@ router.post("/fij-reapply/notify", async (req, res) => {
   } catch (error) {
     console.error("Error sending FIJ reapply invitations:", error);
     res.status(500).json({ message: "Error sending invitations" });
+  }
+});
+
+// Current-round FIJ applicants and their payment proof (first step of the process)
+router.get("/fij-payment-proofs", async (req, res) => {
+  try {
+    const roundApps = await Application.find({ applicationRound: FIJ_CURRENT_ROUND }).select("userId").lean();
+    const users = await User.find({
+      program: FIJ_PROGRAM,
+      $or: [
+        { createdAt: { $gte: FIJ_CURRENT_ROUND_OPENED_AT } },
+        { _id: { $in: roundApps.map((a) => a.userId) } },
+      ],
+    })
+      .select("name email createdAt")
+      .sort({ name: 1 });
+    const applications = await Application.find({ userId: { $in: users.map((u) => u._id) } })
+      .select("userId firstName lastName fijPaymentProofUrl fijPaymentProofUploadedAt")
+      .lean();
+    const appByUserId = new Map(applications.map((a) => [a.userId.toString(), a]));
+
+    const list = users.map((user) => {
+      const app = appByUserId.get(user._id.toString());
+      return {
+        _id: user._id,
+        name: fullNameOf(user, app),
+        email: user.email,
+        // Accounts from the first round reached this list by applying again
+        reapplicant: user.createdAt < FIJ_CURRENT_ROUND_OPENED_AT,
+        hasProof: !!app?.fijPaymentProofUrl,
+        uploadedAt: app?.fijPaymentProofUploadedAt || null,
+      };
+    });
+
+    res.json({ round: FIJ_CURRENT_ROUND, list });
+  } catch (error) {
+    console.error("Error loading FIJ payment proofs:", error);
+    res.status(500).json({ message: "Error loading payment proofs" });
+  }
+});
+
+router.get("/users/:userId/fij-payment-proof", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findById(userId).select("name");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const application = await Application.findOne({ userId }).select("fijPaymentProofUrl");
+    if (!application?.fijPaymentProofUrl) {
+      return res.status(404).json({ message: "No payment proof uploaded for this user." });
+    }
+
+    const fileName = `FIJ_Payment_Proof_${(user.name || "User").replace(/\s+/g, "_")}.pdf`;
+    await sendStoredPaymentProof(res, application.fijPaymentProofUrl, fileName);
+  } catch (error) {
+    console.error("Error downloading FIJ payment proof:", error);
+    res.status(500).json({ message: "Error downloading payment proof" });
   }
 });
 

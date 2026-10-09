@@ -23,6 +23,9 @@ export default function AdminFijReapply() {
   const [search, setSearch] = useState('');
   const [sending, setSending] = useState(false);
   const [progress, setProgress] = useState(null); // { done, total, sent, failed: [] }
+  const [proofs, setProofs] = useState({ list: [], loading: true });
+  const [proofFilter, setProofFilter] = useState('all'); // 'all' | 'missing' | 'uploaded'
+  const [downloadingId, setDownloadingId] = useState(null);
 
   const fetchList = useCallback(async () => {
     try {
@@ -36,13 +39,42 @@ export default function AdminFijReapply() {
     }
   }, []);
 
+  const fetchProofs = useCallback(async () => {
+    try {
+      const res = await api.get('/admin/fij-payment-proofs');
+      setProofs({ list: res.data.list || [], loading: false });
+    } catch (err) {
+      setProofs({ list: [], loading: false, error: err.response?.data?.message || 'Error loading payment proofs' });
+    }
+  }, []);
+
+  const downloadProof = async (row) => {
+    setDownloadingId(row._id);
+    try {
+      const response = await api.get(`/admin/users/${row._id}/fij-payment-proof`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `FIJ_Payment_Proof_${(row.name || 'User').replace(/\s+/g, '_')}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      alert('Error downloading payment proof.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   useEffect(() => {
     fetchList();
+    fetchProofs();
     api
       .get('/admin/fij-reapply/preview')
       .then((res) => setPreview(res.data))
       .catch(() => setPreview(null));
-  }, [fetchList]);
+  }, [fetchList, fetchProofs]);
 
   const handleSendTest = async (e) => {
     e.preventDefault();
@@ -116,6 +148,10 @@ export default function AdminFijReapply() {
   };
 
   const summary = data.summary || {};
+  const proofRows = proofs.list.filter((r) =>
+    proofFilter === 'missing' ? !r.hasProof : proofFilter === 'uploaded' ? r.hasProof : true
+  );
+  const proofsUploaded = proofs.list.filter((r) => r.hasProof).length;
   const emailById = new Map(data.list.map((u) => [u._id, u.email]));
 
   return (
@@ -129,7 +165,7 @@ export default function AdminFijReapply() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Future Innovators Japan: new call</h1>
             <p className="text-gray-600 mt-1">
-              Invite first-round applicants to apply again ({data.round || '—'}). Deadline: {data.deadlineLabel || '—'} (Japan time).
+              Payment proofs for {data.round || 'the current round'} and invitations for first-round applicants. Deadline: {data.deadlineLabel || '—'} (Japan time).
             </p>
           </div>
           <Link to="/admin" className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium">
@@ -141,6 +177,80 @@ export default function AdminFijReapply() {
         </div>
 
         {error && <div className="glass-card p-4 mb-6 text-red-700">{error}</div>}
+
+        {/* Payment proofs: first step for every applicant of the current round */}
+        <div className="glass-card p-4 sm:p-6 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Payment proofs ({data.round || '—'})</h2>
+              <p className="text-sm text-gray-600">
+                {proofs.loading ? 'Loading…' : `${proofsUploaded} of ${proofs.list.length} applicants uploaded their receipt`}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {[
+                { value: 'all', label: 'All' },
+                { value: 'missing', label: 'Missing' },
+                { value: 'uploaded', label: 'Uploaded' },
+              ].map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => setProofFilter(f.value)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${
+                    proofFilter === f.value ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-700 hover:bg-white/60'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {proofs.error && <p className="text-sm text-red-700 mb-3">{proofs.error}</p>}
+          <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-600 border-b border-gray-200">
+                  <th className="px-3 py-2">Name</th>
+                  <th className="px-3 py-2">Email</th>
+                  <th className="px-3 py-2">Applicant</th>
+                  <th className="px-3 py-2">Payment proof</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!proofs.loading && proofRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-3 py-6 text-center text-gray-500">No applicants found.</td>
+                  </tr>
+                ) : (
+                  proofRows.map((row) => (
+                    <tr key={row._id} className="border-b border-gray-100">
+                      <td className="px-3 py-2 text-gray-900">{row.name}</td>
+                      <td className="px-3 py-2 text-gray-700">{row.email}</td>
+                      <td className="px-3 py-2 text-gray-700">{row.reapplicant ? 'Applied again' : 'New'}</td>
+                      <td className="px-3 py-2">
+                        {row.hasProof ? (
+                          <button
+                            type="button"
+                            onClick={() => downloadProof(row)}
+                            disabled={downloadingId === row._id}
+                            className="text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+                          >
+                            {downloadingId === row._id ? 'Downloading…' : `Download (${formatDateTime(row.uploadedAt)})`}
+                          </button>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">Not uploaded</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <h2 className="text-xl font-bold text-gray-900 mb-3">Invite first-round applicants</h2>
 
         {/* Summary */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">

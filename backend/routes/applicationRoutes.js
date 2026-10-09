@@ -16,9 +16,11 @@ import {
 } from "../utils/registrationFee.js";
 import {
   FIJ_CURRENT_ROUND,
+  FIJ_APPLICATION_URL,
   getFijReapplyStatus,
   isFijReapplyEligible,
   isFijCurrentRoundRegistrant,
+  isFijPaymentProofRequired,
   archiveAndResetForFijReapply,
 } from "../utils/fijReapply.js";
 
@@ -62,6 +64,11 @@ router.get("/status", authMiddleware, async (req, res) => {
         registrationFeeAmountUsd,
         stripeConfigured: isStripeConfigured(),
         reapply: getFijReapplyStatus(user, null),
+        fijPaymentProof: {
+          required: isFijPaymentProofRequired(user, null),
+          uploadedAt: null,
+          applicationUrl: FIJ_APPLICATION_URL,
+        },
       });
     }
 
@@ -92,6 +99,11 @@ router.get("/status", authMiddleware, async (req, res) => {
       stripeConfigured: isStripeConfigured(),
       applicationRound: application.applicationRound || null,
       reapply: getFijReapplyStatus(user, application),
+      fijPaymentProof: {
+        required: isFijPaymentProofRequired(user, application),
+        uploadedAt: application.fijPaymentProofUploadedAt || null,
+        applicationUrl: FIJ_APPLICATION_URL,
+      },
     });
   } catch (error) {
     console.error("Error fetching application status:", error);
@@ -154,8 +166,10 @@ router.put("/save", authMiddleware, async (req, res) => {
       lastSavedAt: new Date(),
     };
 
-    // The round is assigned by the server, never by the form
+    // The round and the payment proof are set by the server, never by the form
     delete applicationData.applicationRound;
+    delete applicationData.fijPaymentProofUrl;
+    delete applicationData.fijPaymentProofUploadedAt;
     if (isFijCurrentRoundRegistrant(user)) applicationData.applicationRound = FIJ_CURRENT_ROUND;
 
     // Remove step completion flags for draft saves
@@ -204,6 +218,12 @@ router.put("/submit", authMiddleware, async (req, res) => {
       plagiarismCheckConfirmed,
       signature,
     } = req.body;
+
+    // Future Innovators Japan: the payment proof is the first step
+    const existingApplication = await Application.findOne({ userId: req.userId }).select("applicationRound fijPaymentProofUrl");
+    if (isFijPaymentProofRequired(user, existingApplication) && !existingApplication?.fijPaymentProofUrl) {
+      return res.status(403).json({ message: "Please upload your payment proof before submitting the application form." });
+    }
 
     // Validate required fields
     const requiredFields = {
@@ -262,8 +282,10 @@ router.put("/submit", authMiddleware, async (req, res) => {
       isDraft: false,
       lastSavedAt: new Date(),
     };
-    // The round is assigned by the server, never by the form
+    // The round and the payment proof are set by the server, never by the form
     delete applicationData.applicationRound;
+    delete applicationData.fijPaymentProofUrl;
+    delete applicationData.fijPaymentProofUploadedAt;
     if (isFijCurrentRoundRegistrant(user)) applicationData.applicationRound = FIJ_CURRENT_ROUND;
 
     const application = await Application.findOneAndUpdate(
@@ -483,6 +505,41 @@ router.post("/confirm-dates", authMiddleware, async (req, res) => {
   } catch (error) {
     console.error("Error confirming dates:", error);
     res.status(500).json({ message: "Error submitting dates" });
+  }
+});
+
+// Future Innovators Japan: upload the receipt of the payment made on the program website.
+// First step of the process; no admin review, and it can be replaced at any time.
+router.post("/upload-fij-payment-proof", authMiddleware, paymentProofUpload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded. Please select a PDF file." });
+    }
+
+    const user = await User.findById(req.userId).select("email program createdAt");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    let application = await Application.findOne({ userId: req.userId });
+    if (!isFijPaymentProofRequired(user, application)) {
+      return res.status(403).json({ message: "Payment proof upload is not available for your account." });
+    }
+    if (!application) {
+      application = new Application({ userId: req.userId, email: user.email, applicationRound: FIJ_CURRENT_ROUND });
+    }
+
+    const STORAGE_TYPE = process.env.STORAGE_TYPE || "local";
+    application.fijPaymentProofUrl =
+      STORAGE_TYPE === "s3" && req.file.location ? req.file.location : path.basename(req.file.path);
+    application.fijPaymentProofUploadedAt = new Date();
+    await application.save();
+
+    res.json({
+      message: "Payment proof uploaded successfully.",
+      fijPaymentProofUploadedAt: application.fijPaymentProofUploadedAt,
+    });
+  } catch (error) {
+    console.error("Error uploading FIJ payment proof:", error);
+    res.status(500).json({ message: error.message || "Error uploading payment proof" });
   }
 });
 

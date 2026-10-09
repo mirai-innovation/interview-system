@@ -11,6 +11,8 @@ export const FIJ_CURRENT_ROUND_OPENED_AT = new Date("2026-09-30T00:00:00+09:00")
 // Last moment to restart an application (end of Dec 18, 2026, Japan time).
 export const FIJ_REAPPLY_DEADLINE = new Date("2026-12-18T23:59:59+09:00");
 export const FIJ_REAPPLY_DEADLINE_LABEL = "December 18, 2026";
+// Where applicants apply and pay before using this platform
+export const FIJ_APPLICATION_URL = "https://www.mirai-innovation-lab.com/future-innovators-japan-selection-entry/";
 
 // User fields that hold CV, interview and survey progress
 const USER_PROGRESS_FIELDS = [
@@ -28,6 +30,7 @@ const APPLICATION_RESET_UNSET = [
   "stripeCheckoutSessionId", "stripePaymentIntentId", "invoiceDateRange", "invoiceStatus",
   "scholarshipPercentage", "invoiceApprovedAt", "paymentProofUrl", "paymentProofStatus",
   "paymentProofUploadedAt", "paymentProofApprovedAt", "paymentFollowUp", "scheduledMeeting",
+  "fijPaymentProofUrl", "fijPaymentProofUploadedAt",
 ];
 
 /** True when the user took part in the first FIJ round and may start the current one. */
@@ -42,6 +45,11 @@ export const isFijReapplyEligible = (user, application, now = new Date()) => {
 /** True for FIJ accounts created after the current round opened (new applicants, not reapplicants). */
 export const isFijCurrentRoundRegistrant = (user) =>
   user?.program === FIJ_PROGRAM && !!user.createdAt && user.createdAt >= FIJ_CURRENT_ROUND_OPENED_AT;
+
+/** True for FIJ applicants of the current round, who must upload their payment proof first. */
+export const isFijPaymentProofRequired = (user, application) =>
+  user?.program === FIJ_PROGRAM &&
+  (isFijCurrentRoundRegistrant(user) || application?.applicationRound === FIJ_CURRENT_ROUND);
 
 export const getFijReapplyStatus = (user, application) => ({
   eligible: isFijReapplyEligible(user, application),

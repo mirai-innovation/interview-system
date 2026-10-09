@@ -16,6 +16,22 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
   const isMIRI = program === 'MIRI';
   const isEMFUTECH = program === 'EMFUTECH';
 
+  // Future Innovators Japan (current round): the payment proof comes first and unlocks the form
+  const fijPaymentProofRequired = applicationStatus?.fijPaymentProof?.required === true;
+  const fijPaymentProofUploaded = !!applicationStatus?.fijPaymentProof?.uploadedAt;
+  const fijPaymentSteps = fijPaymentProofRequired
+    ? [
+        {
+          id: 'fij-payment',
+          title: 'Payment Proof',
+          description: 'Upload the receipt of your payment on the program website',
+          route: null,
+          completed: fijPaymentProofUploaded,
+          available: true,
+        },
+      ]
+    : [];
+
   const registrationFeeUsd = applicationStatus?.registrationFeeAmountUsd ?? 250;
   const stripeConfigured = applicationStatus?.stripeConfigured !== false;
 
@@ -54,13 +70,14 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
     : [];
 
   const steps = [
+    ...fijPaymentSteps,
     {
       id: 1,
       title: 'Application Form',
       description: 'Complete your personal and academic information',
       route: '/application-form',
       completed: step1Completed,
-      available: true,
+      available: !fijPaymentProofRequired || fijPaymentProofUploaded,
     },
     {
       id: 'cv',
@@ -304,6 +321,16 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
                     <div className="flex-shrink-0">
                       {isPostLetterPaymentStep ? (
                         renderPostLetterStepAction(step)
+                      ) : step.id === 'fij-payment' ? (
+                        isCompleted ? (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                            Uploaded
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                            Upload below
+                          </span>
+                        )
                       ) : step.id === 4 ? (
                         isAvailable ? (
                           <button
