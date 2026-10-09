@@ -854,7 +854,11 @@ Evaluation Committee`;
  */
 export const buildFijReapplyInvitation = (userName, deadlineLabel, applicationUrl) => {
   const portalBase = process.env.STUDENT_PORTAL_URL || process.env.FRONTEND_URL || 'https://studentportal.mirai-education.tech';
-  const dashboardUrl = `${portalBase.replace(/\/$/, '')}/dashboard`;
+  const portalRoot = portalBase.replace(/\/$/, '');
+  const dashboardUrl = `${portalRoot}/dashboard`;
+  // Images are served by the student portal (frontend/public/email)
+  const logoUrl = `${portalRoot}/email/mirai-logo.png`;
+  const heroUrl = `${portalRoot}/email/fij-hero.jpg`;
   const safeUserName = escapeHtml(userName || 'Applicant');
   const safeDeadline = escapeHtml(deadlineLabel);
   const safeApplicationUrl = escapeHtml(applicationUrl);
@@ -891,25 +895,41 @@ Evaluation Committee`;
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>A new Future Innovators Japan call is open</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; background-color: #f4f4f4;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+<body style="margin: 0; padding: 0; font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; background-color: #f1f5f9;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f1f5f9;">
   <tr>
-    <td style="padding: 20px 0; text-align: center; background-color: #ffffff;">
-      <table role="presentation" style="width: 600px; margin: 0 auto; border-collapse: collapse; background-color: #ffffff;">
+    <td style="padding: 24px 0; text-align: center;">
+      <table role="presentation" style="width: 600px; max-width: 100%; margin: 0 auto; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; overflow: hidden;">
         <tr>
-          <td style="padding: 40px 30px; text-align: center; border-bottom: 3px solid #2563eb;">
-            <h1 style="margin: 0; color: #1e40af; font-size: 24px; font-weight: bold;">
+          <td style="padding: 28px 30px 20px; text-align: center;">
+            <img src="${logoUrl}" alt="Mirai Innovation" width="96" height="96" style="display: block; margin: 0 auto 8px; width: 96px; height: 96px; border: 0;">
+            <p style="margin: 0; color: #1e3a8a; font-size: 16px; font-weight: bold; letter-spacing: 0.3px;">
               Mirai Innovation Research Institute
-            </h1>
-            <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px;">
-              Evaluation and Selection System
+            </p>
+            <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">
+              Osaka, Japan
             </p>
           </td>
         </tr>
         <tr>
-          <td style="padding: 40px 30px; text-align: left;">
+          <td style="padding: 0;">
+            <img src="${heroUrl}" alt="Future Innovators Japan Selection Entry" width="600" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0;">
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 24px 30px; text-align: center; background-color: #1e3a8a;">
+            <p style="margin: 0 0 6px 0; color: #bfdbfe; font-size: 13px; font-weight: bold; letter-spacing: 2px; text-transform: uppercase;">
+              Win a Full Scholarship to Japan
+            </p>
+            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold; line-height: 1.3;">
+              Future Innovators Japan Selection Entry
+            </h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 36px 30px 40px; text-align: left;">
             <h2 style="margin: 0 0 20px 0; color: #1e293b; font-size: 22px; font-weight: 600; text-align: center;">
-              A new Future Innovators Japan call is open
+              A new call is open
             </h2>
             <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
               Hello <strong>${safeUserName}</strong>,
