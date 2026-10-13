@@ -10,9 +10,16 @@ export const FIJ_CURRENT_ROUND = "FIJ-2026-2";
 export const FIJ_CURRENT_ROUND_OPENED_AT = new Date("2026-09-30T00:00:00+09:00");
 // Last moment to restart an application (end of Dec 18, 2026, Japan time).
 export const FIJ_REAPPLY_DEADLINE = new Date("2026-12-18T23:59:59+09:00");
-export const FIJ_REAPPLY_DEADLINE_LABEL = "December 18, 2026";
+export const FIJ_REAPPLY_DEADLINE_LABEL = "December 18th, 2026";
+export const FIJ_EARLY_BIRD_DEADLINE_LABEL = "November 18th, 2026";
 // Where applicants apply and pay before using this platform
 export const FIJ_APPLICATION_URL = "https://www.mirai-innovation-lab.com/future-innovators-japan-selection-entry/";
+// Details shown in the invitation email
+export const FIJ_INVITATION_DETAILS = {
+  earlyBirdDeadlineLabel: FIJ_EARLY_BIRD_DEADLINE_LABEL,
+  deadlineLabel: FIJ_REAPPLY_DEADLINE_LABEL,
+  applicationUrl: FIJ_APPLICATION_URL,
+};
 
 // User fields that hold CV, interview and survey progress
 const USER_PROGRESS_FIELDS = [

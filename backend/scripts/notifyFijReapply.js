@@ -7,8 +7,7 @@ import { sendFijReapplyInvitation } from '../config/email.js';
 import {
   FIJ_PROGRAM,
   FIJ_CURRENT_ROUND_OPENED_AT,
-  FIJ_REAPPLY_DEADLINE_LABEL,
-  FIJ_APPLICATION_URL,
+  FIJ_INVITATION_DETAILS,
   isFijReapplyEligible,
 } from '../utils/fijReapply.js';
 
@@ -65,7 +64,7 @@ async function notifyFijReapply() {
       const app = appByUserId.get(user._id.toString());
       const fullName = app?.firstName && app?.lastName ? `${app.firstName} ${app.lastName}` : user.name;
 
-      const result = await sendFijReapplyInvitation(user.email, fullName, FIJ_REAPPLY_DEADLINE_LABEL, FIJ_APPLICATION_URL);
+      const result = await sendFijReapplyInvitation(user.email, fullName, FIJ_INVITATION_DETAILS);
       if (result.success) {
         await User.updateOne({ _id: user._id }, { $set: { fijReapplyNotifiedAt: new Date() } });
         sent++;

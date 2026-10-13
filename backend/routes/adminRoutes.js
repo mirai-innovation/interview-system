@@ -19,7 +19,7 @@ import {
   FIJ_CURRENT_ROUND_OPENED_AT,
   FIJ_REAPPLY_DEADLINE,
   FIJ_REAPPLY_DEADLINE_LABEL,
-  FIJ_APPLICATION_URL,
+  FIJ_INVITATION_DETAILS,
   isFijReapplyEligible,
 } from "../utils/fijReapply.js";
 import * as XLSX from "xlsx";
@@ -1894,7 +1894,7 @@ router.get("/fij-reapply", async (req, res) => {
 // Rendered invitation email, for previewing in the admin panel
 router.get("/fij-reapply/preview", async (req, res) => {
   const name = typeof req.query.name === "string" && req.query.name.trim() ? req.query.name.trim() : "Applicant Name";
-  res.json(buildFijReapplyInvitation(name, FIJ_REAPPLY_DEADLINE_LABEL, FIJ_APPLICATION_URL));
+  res.json(buildFijReapplyInvitation(name, FIJ_INVITATION_DETAILS));
 });
 
 // Send the invitation to any address as a test; does not mark anyone as notified
@@ -1905,7 +1905,7 @@ router.post("/fij-reapply/test", async (req, res) => {
       return res.status(400).json({ message: "A valid email address is required." });
     }
     const name = typeof req.body.name === "string" && req.body.name.trim() ? req.body.name.trim() : "Applicant Name";
-    const result = await sendFijReapplyInvitation(email, name, FIJ_REAPPLY_DEADLINE_LABEL, FIJ_APPLICATION_URL);
+    const result = await sendFijReapplyInvitation(email, name, FIJ_INVITATION_DETAILS);
     if (!result.success) {
       return res.status(502).json({ message: `Email could not be sent: ${result.error}` });
     }
@@ -1940,7 +1940,7 @@ router.post("/fij-reapply/notify", async (req, res) => {
           results.push({ userId, email: user?.email || null, success: false, reason: "Not eligible" });
           continue;
         }
-        const emailResult = await sendFijReapplyInvitation(user.email, fullNameOf(user, application), FIJ_REAPPLY_DEADLINE_LABEL, FIJ_APPLICATION_URL);
+        const emailResult = await sendFijReapplyInvitation(user.email, fullNameOf(user, application), FIJ_INVITATION_DETAILS);
         if (!emailResult.success) {
           results.push({ userId, email: user.email, success: false, reason: emailResult.error });
           continue;

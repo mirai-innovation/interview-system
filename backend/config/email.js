@@ -848,11 +848,11 @@ Evaluation Committee`;
 /**
  * Invitation for a first-round Future Innovators Japan applicant to apply to the new call from their dashboard.
  * @param {string} userName - User name
- * @param {string} deadlineLabel - Human-readable deadline, e.g. 'December 18, 2026'
- * @param {string} applicationUrl - Program page where applicants apply and pay
+ * @param {{ earlyBirdDeadlineLabel: string, deadlineLabel: string, applicationUrl: string }} details -
+ *   Human-readable deadlines (e.g. 'December 18th, 2026') and the program page where applicants apply and pay
  * @returns {{ subject: string, text: string, html: string }}
  */
-export const buildFijReapplyInvitation = (userName, deadlineLabel, applicationUrl) => {
+export const buildFijReapplyInvitation = (userName, { earlyBirdDeadlineLabel, deadlineLabel, applicationUrl }) => {
   const portalBase = process.env.STUDENT_PORTAL_URL || process.env.FRONTEND_URL || 'https://studentportal.mirai-education.tech';
   const portalRoot = portalBase.replace(/\/$/, '');
   const dashboardUrl = `${portalRoot}/dashboard`;
@@ -860,14 +860,18 @@ export const buildFijReapplyInvitation = (userName, deadlineLabel, applicationUr
   const logoUrl = `${portalRoot}/email/mirai-logo.png`;
   const heroUrl = `${portalRoot}/email/fij-hero.jpg`;
   const safeUserName = escapeHtml(userName || 'Applicant');
+  const safeEarlyBirdDeadline = escapeHtml(earlyBirdDeadlineLabel);
   const safeDeadline = escapeHtml(deadlineLabel);
   const safeApplicationUrl = escapeHtml(applicationUrl);
 
-  const textVersion = `Mirai Innovation Research Institute - A new Future Innovators Japan call is open
+  const textVersion = `Mirai Innovation Research Institute - Future Innovators Japan Selection Entry 2027 is open
 
 Hello ${userName || 'Applicant'},
 
-A new call for the Future Innovators Japan Selection Entry is now open, and as a previous applicant you can apply again.
+A new call for the Future Innovators Japan Selection Entry 2027 is now open, and as a previous applicant you can apply again.
+
+Early-bird application deadline: ${earlyBirdDeadlineLabel}
+Final application deadline: ${deadlineLabel}
 
 To apply again:
 
@@ -878,8 +882,6 @@ ${applicationUrl}
 ${dashboardUrl}
 
 3. Upload your payment receipt (PDF) as the first step. Then review your application form (your previous answers are pre-filled), upload your CV and complete the AI interview again.
-
-The deadline to apply is ${deadlineLabel}.
 
 If you have any questions, please contact us.
 
@@ -893,7 +895,7 @@ Evaluation Committee`;
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>A new Future Innovators Japan call is open</title>
+  <title>Future Innovators Japan Selection Entry 2027 is open</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; background-color: #f1f5f9;">
   <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f1f5f9;">
@@ -913,7 +915,7 @@ Evaluation Committee`;
         </tr>
         <tr>
           <td style="padding: 0;">
-            <img src="${heroUrl}" alt="Future Innovators Japan Selection Entry" width="600" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0;">
+            <img src="${heroUrl}" alt="Future Innovators Japan Selection Entry 2027" width="600" style="display: block; width: 100%; max-width: 600px; height: auto; border: 0;">
           </td>
         </tr>
         <tr>
@@ -922,7 +924,7 @@ Evaluation Committee`;
               Win a Full Scholarship to Japan
             </p>
             <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold; line-height: 1.3;">
-              Future Innovators Japan Selection Entry
+              Future Innovators Japan Selection Entry 2027
             </h1>
           </td>
         </tr>
@@ -935,8 +937,20 @@ Evaluation Committee`;
               Hello <strong>${safeUserName}</strong>,
             </p>
             <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-              A new call for the <strong>Future Innovators Japan Selection Entry</strong> is now open, and as a previous applicant you can apply again.
+              A new call for the <strong>Future Innovators Japan Selection Entry 2027</strong> is now open, and as a previous applicant you can apply again.
             </p>
+            <table role="presentation" style="width: 100%; margin: 0 0 24px 0; border-collapse: separate; border-spacing: 0; background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;">
+              <tr>
+                <td style="padding: 14px 18px 6px; color: #1e3a8a; font-size: 15px; line-height: 1.5;">
+                  <strong>Early-bird application deadline:</strong> ${safeEarlyBirdDeadline}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 18px 14px; color: #1e3a8a; font-size: 15px; line-height: 1.5;">
+                  <strong>Final application deadline:</strong> ${safeDeadline}
+                </td>
+              </tr>
+            </table>
             <p style="margin: 0 0 10px 0; color: #475569; font-size: 16px; line-height: 1.6;">
               To apply again:
             </p>
@@ -945,9 +959,6 @@ Evaluation Committee`;
               <li style="margin-bottom: 8px;">Log in to your <strong>Dashboard</strong> and click <strong>Apply again</strong>.</li>
               <li>Upload your <strong>payment receipt (PDF)</strong> as the first step. Then review your application form (your previous answers are pre-filled), upload your CV and complete the AI interview again.</li>
             </ol>
-            <p style="margin: 0 0 30px 0; color: #475569; font-size: 16px; line-height: 1.6;">
-              The deadline to apply is <strong>${safeDeadline}</strong>.
-            </p>
             <div style="text-align: center; margin-top: 30px;">
               <a href="${safeApplicationUrl}" style="display: inline-block; margin: 0 6px 12px; padding: 14px 28px; background-color: #ffffff; color: #2563eb; border: 2px solid #2563eb; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
                 1. Apply &amp; pay
@@ -984,16 +995,16 @@ Evaluation Committee`;
 </html>`;
 
   return {
-    subject: 'A new Future Innovators Japan call is open - Mirai Innovation Research Institute',
+    subject: 'Future Innovators Japan Selection Entry 2027 is open - Mirai Innovation Research Institute',
     text: textVersion,
     html: htmlVersion,
   };
 };
 
-export const sendFijReapplyInvitation = async (userEmail, userName, deadlineLabel, applicationUrl) => {
+export const sendFijReapplyInvitation = async (userEmail, userName, details) => {
   try {
     const transporter = createTransporter();
-    const { subject, text, html } = buildFijReapplyInvitation(userName, deadlineLabel, applicationUrl);
+    const { subject, text, html } = buildFijReapplyInvitation(userName, details);
     const result = await transporter.sendMail({
       from: `"Mirai Innovation Research Institute" <${process.env.EMAIL_USER}>`,
       to: userEmail,
