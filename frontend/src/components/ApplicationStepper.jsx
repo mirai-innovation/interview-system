@@ -40,7 +40,7 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
         {
           id: 5,
           title: 'Registration Fee Payment',
-          description: `Pay the program registration fee (USD ${registrationFeeUsd}) via Stripe`,
+          description: `Pay the program registration fee (USD ${registrationFeeUsd}) via Stripe. Once paid, you can select your participation dates.`,
           route: null,
           completed: registrationFeePaid,
           available: step4Completed,
@@ -48,7 +48,7 @@ const ApplicationStepper = ({ applicationStatus, onDownloadAcceptanceLetterSucce
         {
           id: 6,
           title: 'Register Payment',
-          description: 'Upload your tuition payment receipt (PDF) for admin verification',
+          description: 'Select your participation dates, then upload your tuition payment receipt (PDF) once they are approved',
           route: null,
           completed: paymentProofStatus === 'approved',
           available: step4Completed && registrationFeePaid,

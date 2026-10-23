@@ -171,9 +171,23 @@ function streamMIRIAcceptanceLetterPdf(res, user, application) {
     })
     .font("Helvetica")
     .text(
-      "for the program. To confirm your participation, please log in to your student portal dashboard to pay the registration fee, select your preferred participation dates, and complete the remaining steps.",
+      "for the program. To confirm your participation, please log in to your student portal dashboard and complete these two steps in order:",
       { align: "justify", width: textWidth }
     );
+
+  // Two separate steps: the fee must be paid before dates can be selected
+  const stepIndent = 18;
+  const stepOptions = { width: textWidth - stepIndent, lineGap: 2 };
+  doc.moveDown(0.4);
+  doc
+    .font("Helvetica-Bold")
+    .text("1. Pay the registration fee (USD 250).", doc.page.margins.left + stepIndent, doc.y, stepOptions);
+  doc
+    .font("Helvetica-Bold")
+    .text("2. ", { ...stepOptions, continued: true })
+    .font("Helvetica")
+    .text("Once your payment is confirmed, select your participation dates.", stepOptions);
+  doc.x = doc.page.margins.left;
 
   doc.moveDown(0.8);
   doc.font("Helvetica-Bold").text(`Registration Code: ${regCode}`, {
@@ -234,7 +248,7 @@ function streamMIRIAcceptanceLetterPdf(res, user, application) {
     bodyOptions
   );
 
-  doc.moveDown(1.5);
+  doc.moveDown(1);
   const centerTextX = (doc.page.width - textWidth) / 2;
   const cierreY = doc.y;
 
