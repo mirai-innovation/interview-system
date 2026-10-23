@@ -852,7 +852,17 @@ const AdminPanel = () => {
                       const formatD = (d) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
                       return (
                         <tr key={uid} className="bg-white/60 hover:bg-white/80">
-                          <td className="px-4 py-3 text-gray-900">{row.name || '—'}</td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => fetchUserDetails(uid)}
+                              disabled={loadingDetails}
+                              className="text-left font-medium text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50"
+                              title="View application details"
+                            >
+                              {row.name || '—'}
+                            </button>
+                          </td>
                           <td className="px-4 py-3 text-gray-700">{row.email || '—'}</td>
                           <td className="px-4 py-3 text-gray-700">{row.program || '—'}</td>
                           <td className="px-4 py-3 text-gray-700">{formatD(row.applicationSubmittedAt)}</td>
@@ -868,55 +878,17 @@ const AdminPanel = () => {
                               <option value="FIJSE">FIJSE</option>
                             </select>
                           </td>
-                          <td className="px-4 py-3 flex flex-wrap gap-2">
+                          <td className="px-4 py-3">
+                            {/* The notify endpoint marks the letter as generated before emailing the student */}
                             <button
                               type="button"
                               onClick={async () => {
-                                setPendingDecisionActionUserId(uid);
-                                try {
-                                  const response = await api.get(`/admin/users/${uid}/acceptance-letter?programType=${selectedProgram}`, { responseType: 'blob' });
-                                  const disposition = response.headers['content-disposition'];
-                                  const fileNameMatch = disposition?.match(/filename="?([^"]+)"?/);
-                                  const fileName = fileNameMatch?.[1] || `Decision_Letter_${(row.name || 'User').replace(/\s+/g, '_')}.pdf`;
-                                  const url = window.URL.createObjectURL(new Blob([response.data]));
-                                  const link = document.createElement('a');
-                                  link.href = url;
-                                  link.setAttribute('download', fileName);
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  link.remove();
-                                  window.URL.revokeObjectURL(url);
-                                  await fetchPendingDecisionLetters();
-                                } catch (err) {
-                                  if (err.response?.data instanceof Blob) {
-                                    err.response.data.text().then((text) => {
-                                      try {
-                                        const j = JSON.parse(text);
-                                        alert(j.message || 'Error generating PDF.');
-                                      } catch {
-                                        alert('Error generating decision letter PDF.');
-                                      }
-                                    });
-                                  } else {
-                                    alert(err.response?.data?.message || 'Error generating decision letter PDF.');
-                                  }
-                                } finally {
-                                  setPendingDecisionActionUserId(null);
-                                }
-                              }}
-                              disabled={isBusy}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-50"
-                            >
-                              {isBusy ? '…' : 'Generate & Download'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={async () => {
+                                if (!confirm(`Generate the ${selectedProgram} decision letter for ${row.name || row.email} and notify them by email?`)) return;
                                 setPendingDecisionActionUserId(uid);
                                 try {
                                   await api.post(`/admin/users/${uid}/acceptance-letter/notify`, { programType: selectedProgram });
                                   await fetchPendingDecisionLetters();
-                                  alert('Notification sent. The user will receive an email and can download their decision letter from the dashboard.');
+                                  alert('Decision letter generated and notification sent. The user can download it from their dashboard.');
                                 } catch (err) {
                                   alert(err.response?.data?.message || 'Error sending notification.');
                                 } finally {
@@ -924,9 +896,9 @@ const AdminPanel = () => {
                                 }
                               }}
                               disabled={isBusy}
-                              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium disabled:opacity-50"
+                              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium whitespace-nowrap disabled:opacity-50"
                             >
-                              Notify User
+                              {isBusy ? 'Sending…' : 'Generate & Notify'}
                             </button>
                           </td>
                         </tr>
